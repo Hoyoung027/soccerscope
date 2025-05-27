@@ -53,3 +53,20 @@ h1 {
 	padding: 16px;
 	display: flex;
 }
+
+.selected-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: black;
+}
+
+.info-line {
+  font-size: 13px;
+  color: black;
+}
+
+.confidence {
+  color: #333;
+  font-size: 11px;
+}

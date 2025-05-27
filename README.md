@@ -4,9 +4,12 @@
 You must fill out the following form. Please see LearnUs for detailed instructions.
 
 ---
-- Name: __________
-- URL to video demo: https://..........
-- Optional comment: __________
+- Name: 변호영
+- URL to video demo: https://youtu.be/8irC54vVJ64
+- Optional comment: 
+
+사용한 GPT Prompt
+
 
 ---
 

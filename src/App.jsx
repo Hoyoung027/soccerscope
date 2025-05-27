@@ -315,14 +315,13 @@ function App() {
 
 	useEffect(() => {
 		const ssvg = d3.select('#score-distribution svg');
-		// 1) 이전에 그린 그래프 지우기
 		ssvg.selectAll('.focus-line').remove();
 
-		// 2) 포커스 대상 (선택된(selected) or 호버된(hovered))
+		// selected, hovered 일 경우 그래프 표시가 목표
 		const focus = selected || hovered;
 		if (!focus) return;
 
-		// 3) 레이아웃 재계산
+		// 레이아웃 연산산
 		const margin = { top: 30, left: 80, right: 20, bottom: 20 };
 		const svgW = +ssvg.attr('width');
 		const svgH = +ssvg.attr('height');
@@ -330,12 +329,12 @@ function App() {
 		const height = svgH - margin.top  - margin.bottom;
 		const rowH = height / 10;
 
-		// 4) xScale 재정의 (0–1 → 화면 좌표)
+		// xScale 정의
 		const xScale = d3.scaleLinear()
 			.domain([0, 1])
 			.range([margin.left, margin.left + width]);
 
-		// 5) line generator: stepBefore curve
+		// line 생성기 
 		const lineGen = d3.line()
 			.x(d => xScale(d))
 			.y((d, i) => 
@@ -346,7 +345,7 @@ function App() {
 			)
 			.curve(d3.curveStepBefore);
 
-		// 6) path 그리기
+		// path 그리기기
 		ssvg.append('path')
 			.datum(focus.predicted_scores)
 			.attr('class', 'focus-line')
@@ -357,7 +356,8 @@ function App() {
 
 		const score9 = focus.predicted_scores[9];
 		const x9 = xScale(score9);
-		// 클래스 9 행의 중앙 위치 계산 (i=9)
+
+		// 클래스 9는 별도로 추가 도입
 		const yCenter9 = margin.top + rowH * 9 + rowH / 2 + 16;
 		ssvg.append('line')
 			.attr('class', 'focus-line')
@@ -372,7 +372,7 @@ function App() {
 
 	return (
 	<>
-		<h1>Data Visualization HW 3 Sample</h1>
+		<h1>Data Visualization HW 3</h1>
 
 		<div id="container">
 		<div id="sidebar">

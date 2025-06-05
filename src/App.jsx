@@ -1,426 +1,347 @@
+// src/App.jsx
 import { useState, useEffect } from 'react';
-import * as d3 from 'd3'
+import * as d3 from 'd3';
+import Formation from './components/Formation';
+import Header from './components/Header';
+import TeamStat from './components/TeamStat';
 import './App.css';
 
+const POSITION_COORDS_433 = {
+  GK:  { x: 0.5,  y: 0.90 },
+  LB:  { x: 0.15, y: 0.75 },
+  LCB: { x: 0.35, y: 0.75 },
+  RCB: { x: 0.65, y: 0.75 },
+  RB:  { x: 0.85, y: 0.75 },
+  LM:  { x: 0.25, y: 0.50 },
+  CM:  { x: 0.50, y: 0.50 },
+  RM:  { x: 0.75, y: 0.50 },
+  LF:  { x: 0.20, y: 0.25 },
+  CF:  { x: 0.50, y: 0.17 },
+  RF:  { x: 0.80, y: 0.25 },
+};
+
+const parseValue = (val) => {
+  return Number(val) || 0;
+};
 
 function App() {
-	// Define state variables.
-	const [items, setItems] = useState([]);
-	const [hovered, setHovered] = useState(null);  
-	const [selected, setSelected] = useState(null);
-	const [trueFilter, setTrueFilter] = useState(null); 
-	const [predFilter, setPredFilter] = useState(null); 
+  
+  // 2) player_stat.csv에서 팀별로 집계한 결과를 저장
+  const [teamAggregates, setTeamAggregates] = useState({});
 
-	useEffect(() => {
-		fetch('predictions.json')
-			.then((response) => response.json())
-			.then((jsonData) => {
-				// Print data into console for debugging.
-				console.log(jsonData);
+  // 3) 각 지표별 “전체 팀 중 최대값” 저장
+  const [maxStats, setMaxStats] = useState({});
 
-				// Save data items to state.
-				setItems(jsonData);
-
-				// Preprocess data.
-
-			})
-			.catch((error) => {
-				console.error('Error loading JSON file:', error);
-			});
-	}, []);
-
-	// Prep.
-
-	// Projection View
-	useEffect(() => {
-		if (items.length == 0) return;
-
-		const svg = d3.select('#projection-view svg')
-			.attr('width', 370)
-			.attr('height', 330);
-
-		svg.selectAll('circle').remove();
-
-		const focus = selected || hovered;
-
-		const xExtent = d3.extent(items, d => d.projection[0]);
-		const yExtent = d3.extent(items, d => d.projection[1]);
-
-		const xScale = d3.scaleLinear()
-		.domain(xExtent).range([20, 350]);
-		
-		const yScale = d3.scaleLinear()
-			.domain(yExtent).range([250, 50]);
-
-		const color = d3.scaleOrdinal()
-			.domain(d3.range(10))
-			.range(d3.schemeCategory10);
-		
-		svg.selectAll('circle')
-			.data(items)
-			.enter()
-			.append('circle')
-				.attr('cx', d => xScale(d.projection[0]))
-				.attr('cy', d => yScale(d.projection[1]))
-				.attr('r', 3)
-				.attr('fill', d => color(d.true_label))
-				.attr('stroke', d => color(d.predicted_label))
-				.attr('stroke-width', 1)
-				.attr('opacity', 0.6)
-				.on('mouseover', (event, d) => setHovered(d))
-				.on('mouseout', () => setHovered(null))
-				.on('click', (event, d) => {
-					setSelected(prev => prev && prev.id === d.id ? null : d);
-				})
-	}, [items]);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [statsError, setStatsError] = useState(null);
 
 
-	// Score Distribution 
-	useEffect(() => {
-	if (!items.length) return;
+  // Formation 구성용
+  const [teamName, setTeamName] = useState('Tottenham'); // 사용자가 검색한 팀 이름
+  const [playersIn433, setPlayersIn433] = useState([]); // 포메이션에 그릴 선수 리스트
+  const [playersLoading, setPlayersLoading] = useState(false);
+  const [playersError, setPlayersError]     = useState(null);
 
-	const svg = d3.select('#score-distribution svg')
-		.attr('width', 960)
-		.attr('height', 600);
-	svg.selectAll('*').remove();
+  useEffect(() => {
+    setStatsLoading(true);
+    setStatsError(null);
 
-	const margin = { top: 30, left: 80, right: 20, bottom: 20 };
-	const width  = +svg.attr('width') - margin.left - margin.right;
-	const height = +svg.attr('height') - margin.top  - margin.bottom;
-	const rowH   = height / 10;
-	const imgS   = 8;
-	const pad    = 2;
+    d3.csv('/player_stat.csv')
+      .then((data) => {
+        // 1) 숫자 필드(parse) - CSV는 문자열로 올 수 있으므로, 숫자형태로 바꿔 줍니다.
+        data.forEach((d) => {
+          d.Gls = Number(d.Gls) || 0;
+          d.xG = Number(d.xG) || 0;
+          d.xAG = Number(d.xAG) || 0;
+          d.SoT = Number(d.SoT) || 0;
+          d.Int = Number(d.Int) || 0;
+          d.Recov = Number(d.Recov) || 0;
+        });
 
-	// 상단 축 그리기
-	const xScale = d3.scaleLinear()
-		.domain([0, 1])
-		.range([margin.left, margin.left + width]);
-		
-	const axisG = svg.append('g')
-		.attr('transform', `translate(0,${margin.top})`)
-		.call(d3.axisTop(xScale)
-		.ticks(10)
-		.tickFormat(d3.format('.1f')));
+        // 2) “팀명(Squad)별 집계” 계산
+        //    { SquadName: { Gls: sum, xG: sum, xAG: sum, SoT: sum, Int: sum, Recov: sum } }
+        const aggregates = {};
+        data.forEach((d) => {
+          const team = d.Squad.trim();
+          if (!aggregates[team]) {
+            aggregates[team] = { Gls: 0, xG: 0, xAG: 0, SoT: 0, Int: 0, Recov: 0 };
+          }
+          aggregates[team].Gls += d.Gls;
+          aggregates[team].xG += d.xG;
+          aggregates[team].xAG += d.xAG;
+          aggregates[team].SoT += d.SoT;
+          aggregates[team].Int += d.Int;
+          aggregates[team].Recov += d.Recov;
+        });
 
+        // 3) 각 지표별 “전체 팀 중 최대값(max)” 계산
+        const maxStatsTemp = { Gls: 0, xG: 0, xAG: 0, SoT: 0, Int: 0, Recov: 0 };
+        Object.values(aggregates).forEach((stats) => {
+          if (stats.Gls   > maxStatsTemp.Gls)   maxStatsTemp.Gls = stats.Gls;
+          if (stats.xG    > maxStatsTemp.xG)    maxStatsTemp.xG = stats.xG;
+          if (stats.xAG   > maxStatsTemp.xAG)   maxStatsTemp.xAG = stats.xAG;
+          if (stats.SoT   > maxStatsTemp.SoT)   maxStatsTemp.SoT = stats.SoT;
+          if (stats.Int   > maxStatsTemp.Int)   maxStatsTemp.Int = stats.Int;
+          if (stats.Recov > maxStatsTemp.Recov) maxStatsTemp.Recov = stats.Recov;
+        });
 
-	axisG.selectAll('.domain')
-		.attr('stroke', '#ccc');
-
-	axisG.selectAll('line')
- 		.attr('stroke', '#ccc');
-
-	axisG.selectAll('text')
- 		.attr('fill', '#666');
-
-
-	// 클래스별 색상 지정
-	const color = d3.scaleOrdinal()
-		.domain(d3.range(10))
-		.range(d3.schemeCategory10);
-
-	// 눈금 값
-	const tickValues = d3.range(0, 1.01, 0.1);
-
-	// 클래스 0~9 선선 그리기
-	for (let i = 0; i < 10; i++) {
-		const y0 = margin.top + rowH * i + rowH / 2;
-
-		svg.append('line')
-		.attr('x1', margin.left)
-		.attr('x2', margin.left + width)
-		.attr('y1', y0 + 16)
-		.attr('y2', y0 + 16)
-		.attr('stroke', '#ccc');
-
-		// 눈금 추가
-		tickValues.forEach(v => {
-		const x = xScale(v);
-		svg.append('line')
-			.attr('x1', x)
-			.attr('x2', x)
-			.attr('y1', y0 + 16 - 4)
-			.attr('y2', y0 + 16)
-			.attr('stroke', '#ccc');
-		});
-
-		// 텍스트
-		svg.append('text')
-			.attr('x', margin.left - 10)
-			.attr('y', y0 - 6)
-			.attr('text-anchor', 'end')
-			.attr('fill', '#666')
-			.text(`Class ${i}`);
-
-		svg.append('text')
-			.attr('class', 'filter-label')
-			.attr('data-class', i)
-			.attr('x', margin.left - 10)
-			.attr('y', y0 + 4)
-			.attr('text-anchor', 'end')
-			.style('font-size', '10px')
-			.style('cursor','pointer')
-			.text(`Labeled as ${i}`)
-			.on('click', () => setTrueFilter(prev => prev === i ? null : i));
-		
-		svg.append('text')
-			.attr('class', 'filter-pred')
-			.attr('data-class', i)
-			.attr('x', margin.left - 10)
-			.attr('y', y0 + 16)
-			.attr('text-anchor', 'end')
-			.style('font-size', '10px')
-			.style('cursor','pointer')
-			.text(`Predicted as ${i}`)
-			.on('click', () => setPredFilter(prev => prev === i ? null : i));
-
-		// 클래스 데이터 10개로 분할
-		const clsItems = items.filter(d => d.true_label === i);
-		const bins = d3.bin()
-			.domain([0, 1])
-			.thresholds(10)
-			.value(d => d.predicted_scores[i])
-			(clsItems);
+        setTeamAggregates(aggregates);
+        setMaxStats(maxStatsTemp);
+        setStatsLoading(false);
+      })
+      .catch((err) => {
+        console.error('player_stat.csv 로드 실패:', err);
+        setStatsError('Team의 통계 데이터를 불러올 수 없습니다.');
+        setStatsLoading(false);
+      });
+  }, []); 
 
 
-		// 작은 박스형 이미지들 (col, row) 계산 후 격자 배치
-		bins.forEach(bin => {
-			const x0 = xScale(bin.x0);
-			const bw = xScale(bin.x1) - xScale(bin.x0);
+  useEffect(() => {
 
-			// 최대 8개 컬럼
-			const maxCols = 8;
-			const nCol = Math.min(maxCols, Math.max(1, Math.floor((bw - pad) / (imgS + pad))));
+	setPlayersLoading(true);
+	setPlayersError(null);
 
-			bin.forEach((d, idx) => {
-				const col = idx % nCol;
-				const row = Math.floor(idx / nCol);
+    d3.csv('/players_big5.csv')
+      .then((data) => {
 
-				// 각 cell의 좌표
-				const cellX = x0 + col * (imgS + pad) + 4;
-				const cellY = (y0+16-imgS-2) - row * (imgS + pad);
+        const teamPlayers = data.filter(
+          (p) => p.current_club_name === teamName
+        );
 
-				// 배경용 사각형
-				svg.append('rect')
-					.classed('cell', true)
-					.datum(d)
-					.attr('x', cellX)
-					.attr('y', cellY)
-					.attr('width', imgS)
-					.attr('height', imgS)
-					.attr('fill', color(d.true_label))
-					.attr('stroke', color(d.predicted_label))
-					.attr('stroke-width', 1)
-					.on('click', (event, d) => {
-						event.stopPropagation();            
-						setSelected(prev => prev && prev.id === d.id ? null : d);
-						setTrueFilter(null);
-						setPredFilter(null);
-					})
-					.on('mouseover', (e, d) => setHovered(d))
-					.on('mouseout', ()    => setHovered(null));
-					
+        const starters = []; // 선수 명단 
 
-				// 실제 이미지 삽입 
-				svg.append('image')
-					.classed('cell', true)
-					.datum(d)
-					.attr('href', `/images/${d.filename}`)
-					.attr('x', cellX)
-					.attr('y', cellY)
-					.attr('width', imgS)
-					.attr('height', imgS)
-					.on('click', (event, d) => {
-						event.stopPropagation();
-						setSelected(prev => prev && prev.id === d.id ? null : d);
-						setTrueFilter(null);
-						setPredFilter(null);
-					})
-					.on('mouseover', (e, d) => setHovered(d))
-					.on('mouseout', ()    => setHovered(null));
-			});
-		});
-	}
-	}, [items]);
+		// GK
+        const gkCandidates = teamPlayers
+          .filter((p) => p.sub_position === 'Goalkeeper')
+          .sort((a, b) => parseValue(b.market_value_in_eur) - parseValue(a.market_value_in_eur));
 
+        if (gkCandidates.length > 0) {
+          const gk = gkCandidates[0];
+          starters.push({
+            id: gk.player_id,
+            x: POSITION_COORDS_433.GK.x,
+            y: POSITION_COORDS_433.GK.y,
+            color: '#CCCCCC',
+            label: gk.name,
+			name: gk.name,
+			image_url: gk.image_url,                 
+			country_of_citizenship: gk.country_of_citizenship,
+          });
+        }
 
-	// Hover, Select, Filter
-	useEffect(() => {
+        const defenderSubPositions = [
+          'Centre-Back',
+          'Left-Back',
+          'Right-Back',
+        ];
+        
+		// CB는 Centre-Back 중 상위 2명을 LCB, RCB에 지정
+        const cbCandidates = teamPlayers
+          .filter((p) => p.sub_position === 'Centre-Back')
+          .sort((a, b) => parseValue(b.market_value_in_eur) - parseValue(a.market_value_in_eur));
 
-		const focus = selected || hovered;
+        cbCandidates.slice(0, 2).forEach((p, idx) => {
+          const coord = idx === 0
+            ? POSITION_COORDS_433.LCB
+            : POSITION_COORDS_433.RCB;
+          starters.push({
+            id: p.player_id,
+            x: coord.x,
+            y: coord.y,
+            color: '#0074D9',
+            label: p.name,
+			name: p.name,
+			image_url: p.image_url,                 
+			country_of_citizenship: p.country_of_citizenship,
+          });
+        });
 
-		 // 1) Projection View
-		d3.select('#projection-view svg').selectAll('circle')
-			.attr('opacity', d => {
-			if (selected) {
-				return d.id === selected.id ? 1 : 0.1;
-			}
-			if (trueFilter !== null) {
-				if (predFilter !== null) {
-				return (d.true_label === trueFilter && d.predicted_label === predFilter)
-					? 1 : 0.1;
-				}
-				return d.true_label === trueFilter ? 1 : 0.1;
-			}
-			if (predFilter !== null) {
-				return d.predicted_label === predFilter ? 1 : 0.1;
-			}
-			if (hovered) {
-				return d.id === hovered.id ? 1 : 0.1;
-			}
-			return 0.6;
-			})
-			.attr('r', d => 
-			selected
-				? (d.id === selected.id ? 6 : 3)
-				: (hovered && d.id === hovered.id ? 6 : 3)
-			);
+        const lbCandidates = teamPlayers
+          .filter((p) => p.sub_position === 'Left-Back')
+          .sort((a, b) => parseValue(b.market_value_in_eur) - parseValue(a.market_value_in_eur));
 
-		// 2) Score Distribution View
-		d3.select('#score-distribution svg').selectAll('rect.cell, image.cell')
-			.attr('opacity', d => {
-			if (selected) {
-				return d.id === selected.id ? 1 : 0.1;
-			}
-			if (trueFilter !== null) {
-				if (predFilter !== null) {
-				return (d.true_label === trueFilter && d.predicted_label === predFilter)
-					? 1 : 0.1;
-				}
-				return d.true_label === trueFilter ? 1 : 0.1;
-			}
-			if (predFilter !== null) {
-				return d.predicted_label === predFilter ? 1 : 0.1;
-			}
-			if (hovered) {
-				return d.id === hovered.id ? 1 : 0.1;
-			}
-			return 1;
-			});
+        if (lbCandidates.length > 0) {
+          const lb = lbCandidates[0];
+          starters.push({
+            id: lb.player_id,
+            x: POSITION_COORDS_433.LB.x,
+            y: POSITION_COORDS_433.LB.y,
+            color: '#0074D9',
+            label: lb.name,
+			name: lb.name,
+			image_url: lb.image_url,                 
+			country_of_citizenship: lb.country_of_citizenship,
+          });
+        }
 
-			d3.selectAll('.filter-label')
-				.style('text-decoration', function() {
-					return +d3.select(this).attr('data-class') === trueFilter
-					? 'underline'
-					: 'none';
-				});
+        const rbCandidates = teamPlayers
+          .filter((p) => p.sub_position === 'Right-Back')
+          .sort((a, b) => parseValue(b.market_value_in_eur) - parseValue(a.market_value_in_eur));
 
-			d3.selectAll('.filter-pred')
-				.style('text-decoration', function() {
-					return +d3.select(this).attr('data-class') === predFilter
-					? 'underline'
-					: 'none';
-				});
+        if (rbCandidates.length > 0) {
+          const rb = rbCandidates[0];
+          starters.push({
+            id: rb.player_id,
+            x: POSITION_COORDS_433.RB.x,
+            y: POSITION_COORDS_433.RB.y,
+            color: '#0074D9',
+            label: rb.name,
+			name: rb.name,
+			image_url: rb.image_url,                 
+			country_of_citizenship: rb.country_of_citizenship,
+          });
+        }
 
-	}, [hovered, selected, trueFilter, predFilter]);
+        // MF 3명 선발 후 LM, CM, RM에 배치치
+        const midfielderSubPositions = [
+          'Defensive Midfield',
+          'Central Midfield',
+          'Attacking Midfield',
+          'Left Midfield',
+          'Right Midfield',
+        ];
+        const midCandidates = teamPlayers
+          .filter((p) => midfielderSubPositions.includes(p.sub_position))
+          .sort((a, b) => parseValue(b.market_value_in_eur) - parseValue(a.market_value_in_eur))
+          .slice(0, 3);
 
-	useEffect(() => {
-		const ssvg = d3.select('#score-distribution svg');
-		ssvg.selectAll('.focus-line').remove();
+        midCandidates.forEach((p, idx) => {
+          let coord;
+          if (idx === 0) coord = POSITION_COORDS_433.LM;
+          else if (idx === 1) coord = POSITION_COORDS_433.CM;
+          else coord = POSITION_COORDS_433.RM;
 
-		// selected, hovered 일 경우 그래프 표시가 목표
-		const focus = selected || hovered;
-		if (!focus) return;
+          starters.push({
+            id: p.player_id,
+            x: coord.x,
+            y: coord.y,
+            color: '#FF4136',
+            label: p.name,
+			name: p.name,
+			image_url: p.image_url,                 
+			country_of_citizenship: p.country_of_citizenship,
+          });
+        });
 
-		// 레이아웃 연산산
-		const margin = { top: 30, left: 80, right: 20, bottom: 20 };
-		const svgW = +ssvg.attr('width');
-		const svgH = +ssvg.attr('height');
-		const width = svgW - margin.left - margin.right;
-		const height = svgH - margin.top  - margin.bottom;
-		const rowH = height / 10;
-
-		// xScale 정의
-		const xScale = d3.scaleLinear()
-			.domain([0, 1])
-			.range([margin.left, margin.left + width]);
-
-		// line 생성기 
-		const lineGen = d3.line()
-			.x(d => xScale(d))
-			.y((d, i) => 
-				margin.top     
-				+ rowH * (i-1)    
-				+ rowH / 2    
-				+ 16          
-			)
-			.curve(d3.curveStepBefore);
-
-		// path 그리기기
-		ssvg.append('path')
-			.datum(focus.predicted_scores)
-			.attr('class', 'focus-line')
-			.attr('d', lineGen)
-			.attr('stroke', 'black')
-			.attr('stroke-width', 1.5)
-			.attr('fill', 'none');
-
-		const score9 = focus.predicted_scores[9];
-		const x9 = xScale(score9);
-
-		// 클래스 9는 별도로 추가 도입
-		const yCenter9 = margin.top + rowH * 9 + rowH / 2 + 16;
-		ssvg.append('line')
-			.attr('class', 'focus-line')
-			.attr('x1', x9).attr('x2', x9)
-			.attr('y1', yCenter9 - rowH/2 - 28)
-			.attr('y2', yCenter9 + rowH/2 - 28)
-			.attr('stroke', 'black')
-			.attr('stroke-width', 1.5);
-
-	}, [selected, hovered]);
+		// FW
+        const forwardSubPositions = [
+          'Left Winger',
+          'Right Winger',
+          'Centre-Forward',
+          'Second Striker',
+        ];
+        const fwCandidates = teamPlayers
+          .filter((p) => forwardSubPositions.includes(p.sub_position))
+          .sort((a, b) => parseValue(b.market_value_in_eur) - parseValue(a.market_value_in_eur));
 
 
-	return (
-	<>
-		<h1>Data Visualization HW 3</h1>
+        if (fwCandidates.length > 0) {
+          const lf = fwCandidates.find((p) => p.sub_position === 'Left Winger') || fwCandidates[0];
+          starters.push({
+            id: lf.player_id,
+            x: POSITION_COORDS_433.LF.x,
+            y: POSITION_COORDS_433.LF.y,
+            color: '#2ECC40',
+            label: lf.name,
+			name: lf.name,
+			image_url: lf.image_url,                 
+			country_of_citizenship: lf.country_of_citizenship,
+          });
+        }
 
-		<div id="container">
-		<div id="sidebar">
-			<div id="projection-view" className="view-panel">
-			<div className="view-title">Projection View</div>
-			<svg />
-			</div>
-			<div id="selected-image-info" className="view-panel">
-			<div className="view-title">Selected Image</div>
-			<div id="selected-image-info-content">
-				{ (selected || hovered) ? (() => {
-					const focus = selected || hovered;
-					return (
-					<>
-						<img 
-						src={`/images/${focus.filename}`} 
-						width={80} 
-						height={80} 
-						alt={`img-${focus.id}`} 
-						/>
-						<div className="selected-info">
-						<div className="info-line">ID: {focus.id}</div>
-						<div className="info-line">Labeled as {focus.true_label}</div>
-						<div className="info-line">
-							Predicted as {focus.predicted_label}
-							<span className="confidence">
-							&nbsp;(Confidence: {focus.predicted_scores[focus.predicted_label].toFixed(3)})
-							</span>
-						</div>
-						</div>
-						<svg id="parallel-coords" width={80} height={100} />
-					</>
-					);
-				})()
-				: null }
-			</div>
-			</div>
+        if (fwCandidates.length > 1) {
+          const cf = fwCandidates.find(
+            (p) => p.sub_position === 'Centre-Forward' || p.sub_position === 'Second Striker'
+          ) || fwCandidates[1];
+          starters.push({
+            id: cf.player_id,
+            x: POSITION_COORDS_433.CF.x,
+            y: POSITION_COORDS_433.CF.y,
+            color: '#2ECC40',
+            label: cf.name,
+			name: cf.name,
+			image_url: cf.image_url,                 
+			country_of_citizenship: cf.country_of_citizenship,
+          });
+        }
+
+        if (fwCandidates.length > 2) {
+          const rw = fwCandidates.find((p) => p.sub_position === 'Right Winger') || fwCandidates[2];
+          starters.push({
+            id: rw.player_id,
+            x: POSITION_COORDS_433.RF.x,
+            y: POSITION_COORDS_433.RF.y,
+            color: '#2ECC40',
+            label: rw.name,
+			name: rw.name,
+			image_url: rw.image_url,                 
+			country_of_citizenship: rw.country_of_citizenship,
+          });
+        }
+
+        // 전체 선수 목록을 저장
+        setPlayersIn433(starters);
+		setPlayersLoading(false);
+      })
+      .catch((err) => {
+        console.error('CSV 로드 실패:', err);
+		setPlayersError('선수 데이터를 불러오지 못했습니다.');
+        setPlayersLoading(false);
+      });
+  }, [teamName]);
+
+  // 사용자가 헤더에서 검색을 눌렀을 때 팀명을 받아와서 상태를 변경
+  const handleTeamSearch = (searchTerm) => {
+    setTeamName(searchTerm);
+  };
+
+  return (
+    <div>
+      <Header onSearch={handleTeamSearch} /> 
+
+		<div>
+		{/* 로딩 */}
+		{playersLoading && <p>데이터를 불러오는 중입니다...</p>}
+
+		{/* 에러 */}
+		{playersError && <p style={{ color: 'red' }}>{playersError}</p>}
+
+		{/* Formation 렌더링 */}
+		{!playersLoading && !playersError && playersIn433.length > 0 && (
+		<Formation width={600} height={350} players={playersIn433} />
+		)}
+
+		{/* 선수 리스트가 비어 있을 때(팀명이 잘못되었거나, 선수 없음) */}
+		{!playersLoading && !playersError && playersIn433.length === 0 && (
+		<p>“{teamName}” 팀의 선수 정보를 찾을 수 없습니다.</p>
+		)}
 		</div>
+		
+		<div style={{ width: 400, paddingLeft: 20 }}>
+		<h3 style={{ marginTop: 0, color: '#205723' }}>Team’s Stat</h3>
+		{statsLoading && <p>통계 로딩 중...</p>}
+		{statsError && <p style={{ color: 'red' }}>{error}</p>}
 
-		<div id="main-section">
-			<div id="score-distribution" className="view-panel">
-			<div className="view-title">Score Distributions</div>
-			<svg />
-			</div>
-		</div>
-		</div>
-	</>
-	);
+		{/* selectedTeam의 통계가 있으면 Radar Chart 렌더링 */}
+		{!statsLoading && !statsError && teamAggregates[teamName] && (
+		<TeamStat
+			stats={teamAggregates[teamName]}
+			maxStats={maxStats}
+			width={350}
+			height={350}
+		/>
+		)}
+
+		{/* 해당 팀의 통계가 없을 경우 */}
+		{!statsLoading && !statsError && !teamAggregates[teamName] && (
+		<p style={{ color: '#999' }}>
+			“{teamName}” 팀의 통계를 찾을 수 없습니다.
+		</p>
+		)}
+        </div>
+	</div>
+  );
 }
 
 export default App;

@@ -1,12 +1,70 @@
-const Formation = ({ width = 600, height = 350, players = [] }) => {
+import React, { useState } from 'react';
+
+const Formation = ({ width = 400, height = 300, players = [], onSwap, selectedPlayerId, onSelectPlayer }) => {
   // SVG 안에서 필드(축구장) 주변에 줄 여백(margin)을 줍니다.
-  const margin = 20;
+  const margin = 0;
   const fieldWidth = width - 2 * margin;
   const fieldHeight = height - 2 * margin;
 
   // 0~1로 들어온 정규화 좌표(xNorm, yNorm)를 실제 픽셀 좌표로 변환
   const realX = (xNorm) => margin + xNorm * fieldWidth;
   const realY = (yNorm) => margin + yNorm * fieldHeight;
+
+  const cardWidth = 50;
+  const cardHeight = 70;
+
+  const [hoveredId, setHoveredId] = useState(null);
+  const [draggingId, setDraggingId] = useState(null);
+
+  // swap이 일어나는 경우 핸들러
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e, targetStarterId) => {
+    e.preventDefault();
+    const draggedPlayerId = e.dataTransfer.getData('text/plain');
+    console.log('onDrop(필드↔필드 또는 벤치→필드) →', draggedPlayerId, '↔', targetStarterId);
+    if (draggedPlayerId && onSwap) {
+      onSwap(draggedPlayerId, targetStarterId);
+    }
+  };
+
+  const handleDragStart = (e, playerId, playerName) => {
+    // 1) 드래그 데이터에 playerId를 저장
+    e.dataTransfer.setData('text/plain', playerId);
+    e.dataTransfer.effectAllowed = 'move';
+
+    // 2) “오프스크린(offscreen)”에 임시 <div> 생성
+    const previewDiv = document.createElement('div');
+    previewDiv.style.position = 'absolute';
+    previewDiv.style.top = '-1000px';  // 화면 밖으로 완전히 보냄
+    previewDiv.style.left = '-1000px';
+    previewDiv.style.padding = '4px 8px';
+    previewDiv.style.background = 'white';
+    previewDiv.style.border = '1px solid #333';
+    previewDiv.style.borderRadius = '4px';
+    previewDiv.style.fontSize = '12px';
+    previewDiv.style.fontFamily = 'sans-serif';
+    previewDiv.style.color = '#000';
+    previewDiv.style.pointerEvents = 'none'; // 클릭 등 이벤트 막기
+    previewDiv.innerText = playerName;
+
+    // 문서에 추가해야만 브라우저가 렌더링을 참조해서 setDragImage가 제대로 동작함
+    document.body.appendChild(previewDiv);
+
+    // 3) <div> 노드를 드래그 프리뷰로 지정
+    //    (offsetX, offsetY를 0,0으로 주면, div의 좌상단이 커서에 붙습니다.
+    //     필요하면 조정)
+    e.dataTransfer.setDragImage(previewDiv, 0, 0);
+
+    // 4) 즉시(혹은 짧은 딜레이 후) DOM에서 제거
+    //    setTimeout 0이 아니면, 일부 브라우저에서 "setDragImage" 값이 잡히기 전에 삭제될 수 있음
+    setTimeout(() => {
+      document.body.removeChild(previewDiv);
+    }, 0);
+  };
 
   return (
     <svg width={width} height={height}>
@@ -17,7 +75,7 @@ const Formation = ({ width = 600, height = 350, players = [] }) => {
         y={margin}
         width={fieldWidth}
         height={fieldHeight}
-        rx={10}               // 모서리 둥글게
+        rx={10}              
         ry={10}
         fill="#45A049"
         stroke="white"
@@ -113,61 +171,122 @@ const Formation = ({ width = 600, height = 350, players = [] }) => {
     {/* ────────────────────────────────────────────────────────── */}
       {/* 7) 플레이어 카드 (이미지 + 이름 + 국적) */}
       {players.map((p) => {
-        // (1) 카드(이미지) 크기: 정사각형 30×30px
-        const imgSize = 30;
 
         // (2) 축구장 위 실제 픽셀 좌표 (중심점)
         const centerX = realX(p.x);
         const centerY = realY(p.y);
 
-        // (3) 이미지(카드) 왼쪽 상단 위치 보정
-        const imgX = centerX - imgSize / 2;
-        const imgY = centerY - imgSize / 2 - 10; 
-        // -10: 사진 위쪽으로 살짝 올려, 이름/국적이 바로 아래에 보이도록
+        // 카드 상단 왼쪽 모서리 좌표
+        const cardX = centerX - cardWidth / 2;
+        const cardY = centerY - cardHeight / 2;
+        
+        // posType 별 카드 이미지 URL
+        const cardImageUrl = `/${p.posType}.png`;
+        const faceImageUrl = p.image_url;
 
-        // (4) 이름 / 국적 텍스트 좌표
-        const textX = centerX;             // 수평 가운데 정렬
-        const nameY = centerY + imgSize / 2 - 5; 
-        const countryY = nameY + 10;       // 이름 아래에 국적
+        // 선수 이미지 오버레이 위치 결정
+        const faceSize = 28;
+        const faceX = centerX - faceSize / 2 * 0.4;
+        const faceY = cardY + cardHeight * 0.18; // 카드 상단에서 10% 지점
+        const textNameY = faceY + faceSize + 16;   // 얼굴 이미지 아랫부분에서 +12px 내려오기
+        const textNationY = textNameY + 10;        // 이름 아랫부분에서 +10px 내려오기
+
+        const isHovered = hoveredId === p.id;
+        const isDragging = draggingId === p.id;
+
+        const scale = isHovered ? 1.1 : 1;
+        const opacity = isDragging ? 0.6 : 1;
+
+        const transform = `
+          translate(${centerX}, ${centerY})
+          scale(${scale})
+          translate(${-centerX}, ${-centerY})
+        `;
+
+        const isSelected = p.id === selectedPlayerId;
 
         return (
-          <g key={p.id}>
-            {/* 7.1) 선수 이미지 (정사각형) */}
-            <image
-              href={p.image_url}     // 로컬 public/images/... 또는 CDN URL
-              x={imgX}
-              y={imgY}
-              width={imgSize}
-              height={imgSize}
-              preserveAspectRatio="xMidYMid slice"
-              style={{ borderRadius: '50%' }} 
-              // SVG에서 직접 border-radius는 적용되지 않으므로, CSS로 가능할 경우 사용
+        
+         <g
+            key={p.id}
+            className={isSelected ? 'player-card selected' : 'player-card'}
+            transform={transform}
+            opacity={opacity}
+            onMouseEnter={() => setHoveredId(p.id)}
+            onMouseLeave={() => setHoveredId(null)}
+            onDragStart={(e) => {
+              setDraggingId(p.id);
+              handleDragStart(e, p.id, p.name);
+            }}
+            onDragEnd={() => setDraggingId(null)}
+            onDragOver={handleDragOver}
+            onDrop={(e) => handleDrop(e, p.id)}
+            onClick={() => onSelectPlayer(p.id)}
+          >
+            {/* 더 넓은 영역에서 드래그 시작할 수 있도록 투명 사각형 도입 */}
+            <rect
+              x={cardX}
+              y={cardY}
+              width={cardWidth}
+              height={cardHeight}
+              fill="transparent"
+              draggable={true}
+              pointerEvents="all"
+              onDragStart={(e) => {
+                setDraggingId(p.id);
+                handleDragStart(e, p.id, p.name);
+              }}
+              onDragEnd={() => setDraggingId(null)}
             />
 
-            {/* 7.2) 선수 이름 (텍스트) */}
+            {/* ─── A. 카드 배경(포지션별) 그리기 ─── */}
+            <image
+              href={cardImageUrl}
+              x={cardX}
+              y={cardY}
+              width={cardWidth}
+              height={cardHeight}
+              preserveAspectRatio="xMidYMid slice"
+            />
+            
+            {/* 선수 이미지 */}
+            <image
+              href={p.image_url}
+              x={faceX}
+              y={faceY}
+              width={faceSize}
+              // height 속성을 생략하면 “원본 비율을 유지”하면서
+              // width=faceWidth에 맞춰 자동으로 세로 크기가 설정됩니다.
+              preserveAspectRatio="xMidYMid meet"
+              style={{
+                // SVG <image>에 borderRadius가 잘 안 먹힐 수 있으니,
+                // 둥근 마스크가 필요하다면 clipPath를 사용해야 합니다.
+                overflow: 'visible',
+              }}
+            />
+
+            {/* 선수 이름 */}
             <text
-              x={textX}
-              y={nameY + 2}
+              x={centerX}
+              y={textNameY}
               textAnchor="middle"
-              fontSize="8"
-              fill="black"
-              stroke="black"
-              strokeWidth={0.2}
+              fontSize="5"
+              fill="#000"
+              stroke="none"
             >
               {p.name}
             </text>
 
-            {/* 7.3) 선수 국적 (텍스트) */}
+            {/* 선수 국적 */}
             <text
-              x={textX}
-              y={countryY}
+              x={centerX}
+              y={textNationY - 2}
               textAnchor="middle"
-              fontSize="5"
-              fill="white" 
-              stroke="white"
-              strokeWidth={0.1}
+              fontSize="4"
+              fill="#555"
+              stroke="none"
             >
-              ({p.country_of_citizenship})
+              {p.nation}
             </text>
           </g>
         );

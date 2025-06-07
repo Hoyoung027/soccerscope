@@ -1,19 +1,9 @@
 // src/components/Header.jsx
 import React, { useState } from 'react';
 
-/**
- * Header 컴포넌트
- *
- * 좌측: 로고(앱 이름)
- * 우측: 팀명 검색 폼
- *
- * Props:
- *  - onSearch (function): 사용자가 검색폼을 제출했을 때 호출될 콜백 (검색어를 인자로 받음)
- */
 const Header = ({ onSearch }) => {
   const [inputValue, setInputValue] = useState('');
 
-  // 폼 제출 시 호출
   const handleSubmit = (e) => {
     e.preventDefault();
     const trimmed = inputValue.trim();
@@ -49,15 +39,15 @@ const Header = ({ onSearch }) => {
 
 export default Header;
 
-// 간단한 인라인 스타일 예시 (원하시면 CSS 클래스나 styled-components로 대체하셔도 됩니다)
 const styles = {
   header: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: '8px 20px',
-    backgroundColor: '#205723', // 짙은 녹색
+    backgroundColor: '#205723',
     color: 'white',
+    marginBottom: '10px',
   },
   logo: {
     fontSize: '1.2rem',

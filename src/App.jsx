@@ -1,5 +1,5 @@
 // src/App.jsx
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 import Formation from './components/Formation';
 import Header from './components/Header';
@@ -8,7 +8,7 @@ import RosterList from './components/RosterList';
 import PlayerDetail from './components/PlayerDetail';
 import TeamDetail from './components/TeamDetail';
 import Draggable from 'react-draggable';     
-
+import StackedChart from './components/StackedChart';
 import './App.css';
 
 const POSITION_COORDS_433 = {
@@ -29,8 +29,33 @@ const parseValue = (val) => {
   return Number(val) || 0;
 };
 
-function App() {
-  
+const COLUMN_LABELS = {
+  Gls:   '골',
+  Ast:   '어시스트 횟수',
+  xG:    '골 기대치',
+  npxG:  '페널티킥 제외 골 기대치',
+  xAG:   '어시스트 기대치',
+  'G/Sh':'슈팅당 득점률',
+  KP:    '키 패스 횟수',
+  PPA:   '박스 진입 패스 수',
+  SCA:   '슛 기여 행동 수',
+  SCA90: '경기당 평균 슛 기여 행동 수',
+  Sh:    '총 슛 수',
+  'Sh/90':'경기당 평균 슛 수',
+  SoT:   '유효 슛 수',
+  'SoT/90':'경기당 평균 유효 슛 수',
+  PrgC:  '전진 드리블 수',
+  Carries: '드리블 수',
+  PrgDist_stats_possession:'드리블 이동 거리',
+  PrgP:  '전진 패스 수',
+  Tkl:   '태클 수',
+  'Tkl%':'태클 성공률',
+  Int:   '인터셉트 수',
+  Recov: '볼 리커버리 수'
+};
+
+export default function App() {
+
   // stats.csv에서 팀별로 집계한 결과를 저장
   const [teamAggregates, setTeamAggregates] = useState({});
 
@@ -54,6 +79,18 @@ function App() {
   const [playersIn433, setPlayersIn433] = useState([]); 
   const [teamPlayers, setTeamPlayers] = useState([]);
 
+  const [rawData, setRawData] = useState(null);
+  const [columns, setColumns] = useState([]);
+  const [baseline, setBaseline] = useState(null);
+
+  // 1) 수동으로 추가한 플레이어
+  const [manualPlayers, setManualPlayers] = useState([]);
+  // 2) 추천 로직으로 생성된 플레이어
+  const [recommendedPlayers, setRecommendedPlayers] = useState([]);
+  const [inputName, setInputName] = useState('');
+
+  // 차트에 넘길 최종 선수 목록
+  const chartPlayers = [...manualPlayers, ...recommendedPlayers];
 
   useEffect(() => {
     setStatsLoading(true);
@@ -61,9 +98,10 @@ function App() {
 
     d3.csv('/stats.csv')
       .then((data) => {
+        // --- 데이터 파싱 & 집계 ---
         data.forEach(d => {
-          d.Age = +parseInt(d.Age, 10) || 0;
-          d.market_value = parseInt(d.market_value,10) || 0;
+          d.Age     = +parseInt(d.Age, 10) || 0;
+          d.market_value = parseInt(d.market_value, 10) || 0;
           d.total_minutes = +d.total_minutes;
           d.Gls = +d.Gls;
           d.Ast = +d.Ast;
@@ -84,34 +122,39 @@ function App() {
           d.PrgDist_stats_possession = +d.PrgDist_stats_possession;
           d.Recov = +d.Recov;
         });
-        setAllPlayerStats(data);
 
         // 팀별 집계
         const aggregates = {};
-        data.forEach((d) => {
+        data.forEach(d => {
           const team = d.Squad.trim();
           if (!aggregates[team]) {
             aggregates[team] = { total_market_value: 0, Gls: 0, xG: 0, xAG: 0, SoT: 0, Int: 0, Recov: 0 };
           }
           aggregates[team].total_market_value += d.market_value;
-          aggregates[team].Gls += d.Gls;
-          aggregates[team].xG += d.xG;
-          aggregates[team].xAG += d.xAG;
-          aggregates[team].SoT += d.SoT;
-          aggregates[team].Int += d.Int;
-          aggregates[team].Recov += d.Recov;
+          aggregates[team].Gls  += d.Gls;
+          aggregates[team].xG   += d.xG;
+          aggregates[team].xAG  += d.xAG;
+          aggregates[team].SoT  += d.SoT;
+          aggregates[team].Int  += d.Int;
+          aggregates[team].Recov+= d.Recov;
         });
 
+        setAllPlayerStats(data);
         setTeamAggregates(aggregates);
         setStatsLoading(false);
+
+        // 여기서 rawData랑 manualPlayers 초기값 세팅
+        setRawData(data);
+        if (data.length) {
+          setManualPlayers([]);
+        }
       })
-      .catch((err) => {
+      .catch(err => {
         console.error('stats.csv 로드 실패:', err);
         setStatsError('Team의 통계 데이터를 불러올 수 없습니다.');
         setStatsLoading(false);
       });
   }, []);
-
   useEffect(() => {
 
 	setPlayersLoading(true);
@@ -358,8 +401,8 @@ function App() {
       fieldCopy[idxTarget].y = tempY;
       fieldCopy[idxTarget].posType = tempPosType;
 
-      // (옵션) 혹은 두 객체 전체를 통째로 바꿔 넣어도 됩니다:
-      // [ fieldCopy[idxDragged], fieldCopy[idxTarget] ] = [ fieldCopy[idxTarget], fieldCopy[idxDragged] ];
+
+      [ fieldCopy[idxDragged], fieldCopy[idxTarget] ] = [ fieldCopy[idxTarget], fieldCopy[idxDragged] ];
 
       setPlayersIn433(fieldCopy);
       return;
@@ -403,122 +446,291 @@ function App() {
 
   const handleShowClubDetail = () => setShowClubDetail(true);
   const handleCloseClubDetail = () => setShowClubDetail(false);
+  
+  // 수동 추가
+  const handleAddPlayer = () => {
+    const name = inputName.trim();
+    if (!rawData) return;
+    
+    const exists = rawData.find(d => d.Player === name);
+    if (exists && !manualPlayers.includes(name)) {
+      setManualPlayers(mp => [...mp, name]);
+    }
+    setInputName('');
+  };
 
+  const handleRosterDrop = e => {
+    e.preventDefault();
+    const draggedId = e.dataTransfer.getData('text/plain');
+    const player = teamPlayers.find(p => String(p.Player_Id) === String(draggedId));
+    if (player && !manualPlayers.includes(player.Player)) {
+      setManualPlayers(mp => [...mp, player.Player]);
+    }
+  };
+
+  // 수동 추가된 선수 또는 추천된 선수를 삭제
+  const handleRemovePlayer = name => {
+    if (manualPlayers.includes(name)) {
+      // 수동 선수 목록에서 삭제
+      setManualPlayers(mp => mp.filter(p => p !== name));
+    } else {
+      // 추천 선수 목록에서 삭제
+      setRecommendedPlayers(rp => rp.filter(p => p !== name));
+    }
+  };
+
+  // 카테고리 토글 (최대 5개)
+  const allColumns = [
+    'Gls','Ast','xG','npxG','xAG','G/Sh','KP','PPA','SCA','SCA90',
+    'Sh','Sh/90','SoT','SoT/90','PrgC','Carries','PrgDist_stats_possession','PrgP',
+    'Tkl','Tkl%','Int','Recov'
+  ];
+  const handleToggleColumn = col => {
+    if (columns.includes(col)) {
+      setColumns(cs => cs.filter(x => x !== col));
+    } else if (columns.length < 5) {
+      setColumns(cs => [...cs, col]);
+    } else {
+      alert('카테고리는 최대 5개까지 선택 가능합니다.');
+    }
+  };
+
+  // Dancing 기준 컬럼 토글
+  const handleCategoryClick = col => {
+    setBaseline(b => (b === col ? null : col));
+  };
+
+  // 추천 로직
+  useEffect(() => {
+    if (!rawData || manualPlayers.length === 0 || columns.length === 0) {
+      setRecommendedPlayers([]);
+      return;
+    }
+    const base = manualPlayers[0];
+    const baseRow = rawData.find(d => d.Player === base);
+    if (!baseRow) return;
+    const baseMV = +baseRow.market_value;
+
+    const higher = rawData.filter(
+      d => !manualPlayers.includes(d.Player) && +d.market_value > baseMV
+    );
+    const lower = rawData.filter(
+      d => !manualPlayers.includes(d.Player) && +d.market_value < baseMV
+    );
+
+    const sortByRankSum = arr =>
+      arr
+        .map(d => {
+          const sum = columns.reduce((acc, c) => {
+            const raw = d[`${c}_rank`];
+            // 랭크가 유효한 숫자면 변환, 아니면 Infinity
+            const num = (raw != null && raw !== '')
+              ? +raw
+              : Infinity;
+            return acc + num;
+          }, 0);
+          return { player: d.Player, sum };
+        })
+        .sort((a, b) => a.sum - b.sum)
+        .map(x => x.player);
+
+    const topHigh = sortByRankSum(higher).slice(0, 4);
+    const topLow  = sortByRankSum(lower).slice(0, 4);
+
+    setRecommendedPlayers([...topHigh, ...topLow]);
+  }, [rawData, manualPlayers, columns]);
+  
   return (
     <div className="app-container">
+      {/* ===========================
+          1) Header & 검색
+      =========================== */}
+      <Header onSearch={handleTeamSearch} />
 
-      {playersIn433.map((p) => (
-        <img
-          key={p.id}
-          id={`drag-face-${p.id}`}
-          src={p.image_url}           
-          alt={p.name}
-          style={{
-            visibility: 'hidden',     
-            width: 30,               
-            objectFit: 'cover',
-          }}
-        />
-      ))}
-
-      <Header onSearch={handleTeamSearch} /> 
       <div className="content-container">
-
+        {/* ===========================
+            2) Roster 목록
+        =========================== */}
         <div className="roster-wrapper">
           {playersLoading ? (
             <p>선수 목록 로딩 중…</p>
           ) : playersError ? (
             <p style={{ color: 'red' }}>{playersError}</p>
           ) : (
-            <RosterList 
-              teamPlayers={teamPlayers} 
-              starters={playersIn433} 
+            <RosterList
+              teamPlayers={teamPlayers}
+              starters={playersIn433}
               onSelectPlayer={handleSelectPlayer}
-              selectedPlayerId={selectedPlayerId}  
+              selectedPlayerId={selectedPlayerId}
             />
           )}
         </div>
 
+        {/* ===========================
+            3) Formation 필드
+        =========================== */}
         <div className="formation-wrapper">
-          {/* 로딩 */}
           {playersLoading && <p>데이터를 불러오는 중입니다...</p>}
-
-          {/* 에러 */}
           {playersError && <p style={{ color: 'red' }}>{playersError}</p>}
 
-          {/* Formation 렌더링 */}
           {!playersLoading && !playersError && playersIn433.length > 0 && (
-          <Formation 
-            width={400} 
-            height={415} 
-            players={playersIn433} 
-            onSwap={handleSwap}
-            selectedPlayerId={selectedPlayerId}
-            onSelectPlayer={handleSelectPlayer}
-          />
+            <Formation
+              width={400}
+              height={415}
+              players={playersIn433}
+              onSwap={handleSwap}
+              selectedPlayerId={selectedPlayerId}
+              onSelectPlayer={handleSelectPlayer}
+            />
           )}
 
-          {/* 선수 리스트가 비어 있을 때(팀명이 잘못되었거나, 선수 없음) */}
           {!playersLoading && !playersError && playersIn433.length === 0 && (
-          <p>“{teamName}” 팀의 선수 정보를 찾을 수 없습니다.</p>
+            <p>“{teamName}” 팀의 선수 정보를 찾을 수 없습니다.</p>
           )}
-		    </div>
+        </div>
 
-        {selectedPlayerId && (
-          <>
-          <div
-            className="detail-overlay"
-            onClick={() => setSelectedPlayerId(null)}
-          />    
-
-         <Draggable nodeRef={detailRef} handle=".drag-handle">
-           <div className="detail-wrapper" ref={detailRef}>
-             <div className="drag-handle">Player Detail</div>
-             <PlayerDetail
-               playerStat={
-                 allPlayerStats.find(d => d.Player_Id === selectedPlayerId)
-               }
-             />
-           </div>
-         </Draggable>
-         </>
-        )}
-		
+        {/* ===========================
+            4) Team Stat + Detail
+        =========================== */}
         <div className="stat-wrapper">
           <h3 style={{ marginTop: 0, color: '#205723' }}>Team’s Stat</h3>
           {statsLoading && <p>통계 로딩 중...</p>}
           {statsError && <p style={{ color: 'red' }}>{statsError}</p>}
 
-          {/* selectedTeam의 통계가 있으면 Radar Chart 렌더링 */}
           {!statsLoading && !statsError && (
-          <TeamStat
-            teamAggregates={teamAggregates}
-            selectedTeam={teamName}
-            width={350}
-            height={350}
-            onDetailClick={handleShowClubDetail}
-          />
+            <TeamStat
+              teamAggregates={teamAggregates}
+              selectedTeam={teamName}
+              width={350}
+              height={350}
+              onDetailClick={handleShowClubDetail}
+            />
           )}
-
-          {/* 해당 팀의 통계가 없을 경우 */}
           {!statsLoading && !statsError && !teamAggregates[teamName] && (
-          <p style={{ color: '#999' }}>
-            “{teamName}” 팀의 통계를 찾을 수 없습니다.
-          </p>
+            <p style={{ color: '#999' }}>
+              “{teamName}” 팀의 통계를 찾을 수 없습니다.
+            </p>
           )}
         </div>
       </div>
 
-      {showClubDetail && (       
+      {/* ===========================
+          5) Player Comparison 차트
+      =========================== */}
+      <div className="chart-wrapper">
+        <div className="app">
+          <h3 className="app-title">Player Comparison</h3>
+          <div id="container">
+            <div className="sidebar">
+              <div className="box categories-box">
+                <h3 className="box-title">Categories</h3>
+                <div className="category-list">
+                  {allColumns.map(col => (
+                    <label key={col} className="category-item">
+                      <input
+                        type="checkbox"
+                        checked={columns.includes(col)}
+                        onChange={() => handleToggleColumn(col)}
+                      />
+                      {COLUMN_LABELS[col] || col}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="add-box">
+                <div className="add-button-box">
+                  <input
+                    className="add-input"
+                    type="text"
+                    placeholder="Search the Player"
+                    value={inputName}
+                    onChange={e => setInputName(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleAddPlayer()}
+                  />
+                  <button
+                    className="add-btn"
+                    onClick={handleAddPlayer}
+                  >
+                    Search
+                  </button>
+                </div>
+              </div>
+
+
+              <div className="box current-box">
+                <h3 className="box-title">Player list</h3>
+                <ul className="current-list">
+                  {[...manualPlayers, ...recommendedPlayers].map(name => {
+                    const isRec = !manualPlayers.includes(name);
+                    return (
+                      <li key={name} style={{ opacity: isRec ? 0.5 : 1 }}>
+                        <span>{name}</span>
+                        <button
+                          className="remove-btn"
+                          onClick={() => handleRemovePlayer(name)}
+                        >─</button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            </div>
+
+            <div className="chart-container">
+                <div
+                  className="chart-area"
+                  onDragOver={e => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                  }}
+                  onDrop={handleRosterDrop}
+                >
+                <StackedChart
+                  data={rawData}
+                  players={chartPlayers}
+                  columns={columns}
+                  baseline={baseline}
+                  onCategoryClick={handleCategoryClick}
+                  manualCount={manualPlayers.length}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ===========================
+          6) 모달 오버레이들
+      =========================== */}
+      {selectedPlayerId && (
+        <>
+          <div className="detail-overlay" onClick={() => setSelectedPlayerId(null)} />
+          <Draggable nodeRef={detailRef} handle=".drag-handle">
+            <div className="detail-wrapper" ref={detailRef}>
+              <div className="drag-handle">Player Detail</div>
+              <PlayerDetail
+                playerStat={allPlayerStats.find(d => d.Player_Id === selectedPlayerId)}
+              />
+            </div>
+          </Draggable>
+        </>
+      )}
+
+      {showClubDetail && (
         <>
           <div className="detail-overlay" onClick={handleCloseClubDetail} />
-
           <Draggable nodeRef={detailRef} handle=".drag-handle">
             <div className="detail-wrapper" ref={detailRef}>
               <div className="drag-handle">
                 Detail
                 <button
-                  style={{ float: 'right', border: 'none', background: 'transparent', cursor: 'pointer' }}
+                  style={{
+                    float: 'right',
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer'
+                  }}
                   onClick={handleCloseClubDetail}
                 >✕</button>
               </div>
@@ -529,10 +741,9 @@ function App() {
               />
             </div>
           </Draggable>
-      </>
-    )}
-	</div>
+        </>
+      )}
+    </div>
   );
+  
 }
-
-export default App;

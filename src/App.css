@@ -1,86 +1,180 @@
-html, body {
-	position: relative;
-	width: 100%;
-	height: 100%;
+/* 1) 최상위 래퍼: 가로폭 제한 & 가운데 정렬 */
+.app {
+  max-width: 1200px;
+  margin: 40px auto;
+  font-family: 'Pretendard', sans-serif;
 }
 
-body {
-	color: #333;
-	margin: 0;
-	padding: 12px;
-	box-sizing: border-box;
-	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+/* 2) 제목: 한 줄 고정 */
+.app-title {
+  margin: 0 0 16px 0;
+  font-weight: 700;
+  font-size: 24px;
+  line-height: 1;
+  color: #145406;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 #container {
 	display: flex;
 }
 
-h1 {
-	font-size: 1.3rem;
-	font-weight: 500;
-	margin-top: 4px;
-	padding-left: 4px;
+/* 3) 사이드바 + 차트 영역 배치 */
+.chart-container {
+  flex: 1;
+  display: flex;
+  height: 80vh;
 }
 
-#sidebar {
-	display: flex;
-	flex-direction: column;
-	width: 450px;
+/* 4) 사이드바 */
+.sidebar {
+  flex: 0 0 260px;
+  padding: 0px;
 }
 
-#main-section {
-	display: flex;
-	flex-direction: column;
-	width: 1000px;
+/* 5) 공통 박스 스타일 */
+.box {
+  width: 230px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 16px;
+  background-color: #fafafa;
+  box-sizing: border-box;
+  font-size: 14px;
+  font-weight: 100; 
 }
 
-.view-panel {
-	border: 2px solid #eee;
-	margin-bottom: 15px;
-	margin-right: 15px;
+.box-title {
+  margin: 0 0 12px 0;
+  font-weight: 700;
+  font-size: 15px;
+  color: #145406;
+  /* 제목 밑에 구분선 */
+  border-bottom: 1px solid #ccc;
+  padding-bottom: 6px;
 }
 
-.view-title {
-	font-size: 1.0rem;
-	background-color: #f3f3f3;
-	padding: 3px 8px 5px 12px;
-	margin-bottom: 8px;
-}
-
-#selected-image-info-content {
-	height: 100px;
-	padding: 16px;
-	display: flex;
-}
-
-.selected-info {
+/* 6) Categories 박스 */
+.categories-box {
+  height: 280px;
   display: flex;
   flex-direction: column;
+}
+.category-list {
+  flex-grow: 1;
+  overflow-y: auto;
+}
+.category-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
   gap: 4px;
-  color: black;
 }
 
-.info-line {
-  font-size: 13px;
-  color: black;
+/* 8) 현재 플레이어 박스 */
+.current-box {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+}
+.current-box h3 {
+  margin: 0 0 12px 0;
+}
+.current-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  overflow-y: auto;
+}
+.current-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.remove-btn {
+  width: 24px;
+  height: 24px;
+  border: 1px solid #aaa;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0;
 }
 
-.confidence {
-  color: #333;
-  font-size: 11px;
+/* 9) 차트 영역 */
+.chart-area {
+  flex: 1;
+  padding: 16px;
+  height: 100%;
+  box-sizing: border-box;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background-color: #fafafa;
 }
 
+/* 4) SVG가 부모 너비에 꽉 차도록 강제 */
+.chart-area svg {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.player-ticks {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding: 0;
+  list-style: none;
+}
+.player-ticks .tick-line {
+  display: block;
+  line-height: 1.2;
+}
+.player-ticks li {
+  cursor: move;
+  text-align: center;
+  font-size: 12px;
+  user-select: none;
+}
+
+body {
+  background-color: #FCFDF3;
+}
+
+.sidebar .category-item,
+.add-button-box .add-btn,
+.add-button-box .add-input,
+.current-box h3,
+.current-list li span,
+.chart-area .legend text {
+  font-weight: 400 !important;
+}
+
+/* ───────────────────────────────────────
+   차트 내부 텍스트 (축 레이블, 선수 이름, 툴팁 등)
+   Pretendard 400 (Regular)
+─────────────────────────────────────── */
+.chart-area svg text,
+.chart-area .x-axis text,
+.chart-area .y-axis text {
+  font-weight: 400 !important;
+}
+
+/* 추가된 레이아웃 스타일 */
 .app-container {
-  max-width: 950px;   
-  margin: 0 auto;      
-  padding-top: 10px;   
+  max-width: 950px;
+  margin: 0 auto;
+  padding-top: 10px;
   position: relative;
 }
 
 .content-container {
   display: flex;
-  gap: 7px;    /* 각 열 사이 간격 */
+  gap: 7px;
 }
 
 .formation-wrapper {
@@ -89,17 +183,17 @@ h1 {
 
 .roster-wrapper {
   flex: none;
-  width: 150px; 
+  width: 150px;
 }
 
 .stat-wrapper {
   flex: none;
   width: 350px;
   height: 380px;
-  border: 1px solid #ccc;      
-  border-radius: 8px;        
-  padding: 16px;             
-  background-color: #fafafa;  
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 16px;
+  background-color: #fafafa;
 }
 
 .stat-wrapper h3 {
@@ -109,7 +203,7 @@ h1 {
 
 .detail-wrapper {
   position: absolute;
-  top: 30%;             
+  top: 30%;
   left: 60%;
   transform: translate(-50%, -50%);
   width: 190px;
@@ -118,8 +212,8 @@ h1 {
   background: rgba(255,255,255,0.98);
   box-shadow: 0 2px 8px rgba(0,0,0,0.2);
   border-radius: 6px;
-  padding: 0;          
-  font-size: 12px;     
+  padding: 0;
+  font-size: 12px;
   z-index: 1000;
 }
 
@@ -165,7 +259,7 @@ h1 {
   width: 100%;
   height: 100%;
   background: transparent;
-  z-index: 999; 
+  z-index: 999;
 }
 
 @keyframes pulse {
@@ -189,7 +283,7 @@ h1 {
   top: 8px;
   right: 8px;
   padding: 6px 12px;
-  background-color: #4d6f34;    /* 헤더 녹색과 비슷한 톤 */
+  background-color: #4d6f34;
   color: white;
   font-size: 14px;
   font-weight: bold;
@@ -202,4 +296,51 @@ h1 {
 
 .detail-button:hover {
   background-color: #3b5228;
+}
+
+/* add-box 내부에 입력+버튼 가로 정렬 */
+.add-box {
+  margin: 10px 0;
+  padding: 0;           /* 기존과 비슷하게 박스 여백을 제거 */
+  box-sizing: border-box;
+}
+.add-button-box {
+  display: flex;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  overflow: hidden;     /* 둥근 모서리 유지 */
+  height: 40px;
+  max-width: 230px; 
+}
+/* 왼쪽 – 입력창 */
+.add-input {
+  flex: 1;
+  border: none;
+  padding: 0 10px;
+  font-family: 'Pretendard', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 40px;
+  outline: none;
+  background: white;
+  max-width: 180px; 
+}
+/* 오른쪽 – 버튼 */
+.add-btn {
+  border: none;
+  padding: 0 8px;
+  background-color: #44753B;
+  color: #fff;
+  font-family: 'Pretendard', sans-serif;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  max-width: 100px; 
+}
+.add-btn:hover {
+  background-color: #3b5228;
+}
+
+input[type="checkbox"] {
+  accent-color: #44753B;
 }

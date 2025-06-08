@@ -43,11 +43,13 @@ const formatTeamValue = (field, val) => {
   }
 
   if(field === 'xG') {
-    val = val.toFixed(1);
+    const n = Number(val);
+    val = isNaN(n) ? '—' : n.toFixed(1);
   }
 
   if(field === 'xAG') {
-    val = val.toFixed(1);
+    const n = Number(val);
+    val = isNaN(n) ? '—' : n.toFixed(1);
   }
 
   if(field === 'Recov') {

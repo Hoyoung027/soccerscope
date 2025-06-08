@@ -2,6 +2,32 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
 
+
+const COLUMN_LABELS = {
+  Gls:   '골',
+  Ast:   '어시스트 횟수',
+  xG:    '골 기대치',
+  npxG:  '페널티킥 제외 골 기대치',
+  xAG:   '어시스트 기대치',
+  'G/Sh':'슈팅당 득점률',
+  KP:    '키 패스 횟수',
+  PPA:   '박스 진입 패스 수',
+  SCA:   '슛 기여 행동 수',
+  SCA90: '경기당 평균 슛 기여 행동 수',
+  Sh:    '총 슛 수',
+  'Sh/90':'경기당 평균 슛 수',
+  SoT:   '유효 슛 수',
+  'SoT/90':'경기당 평균 유효 슛 수',
+  PrgC:  '전진 드리블 수',
+  Carries: '드리블 수',
+  PrgDist_stats_possession:'드리블 이동 거리',
+  PrgP:  '전진 패스 수',
+  Tkl:   '태클 수',
+  'Tkl%':'태클 성공률',
+  Int:   '인터셉트 수',
+  Recov: '볼 리커버리 수'
+};
+
 export default function StackedChart({
   data,
   players,
@@ -36,6 +62,7 @@ export default function StackedChart({
   }, [data, players, columns, baseline, dims, manualCount]);
 
   function drawChart() {
+
     const svg = d3.select(svgRef.current);
     svg.selectAll('*').remove();
 
@@ -176,14 +203,15 @@ export default function StackedChart({
             const r = data.find(r =>
               safeTrim(r.Player).toLowerCase() === d.player.toLowerCase()
             );
+            const label = COLUMN_LABELS[d.key] || d.key;
             d3.select(tooltipRef.current)
-              .html(`<strong>${d.key}</strong>: ${r ? r[d.key] : 'N/A'}`)
+              .html(`<strong>${label}</strong>: ${r ? r[d.key] : 'N/A'}`)
               .style('visibility', 'visible');
           })
           .on('mousemove', e => {
             const rect = containerRef.current.getBoundingClientRect();
             d3.select(tooltipRef.current)
-              .style('top',  `${e.clientY - rect.top + 10}px`)
+              .style('top',  `${e.clientY - rect.top - 40}px`)
               .style('left', `${e.clientX - rect.left + 10}px`);
           })
           .on('mouseout', () =>
@@ -224,7 +252,7 @@ export default function StackedChart({
         .attr('x', d => xScale(d.player) + xScale.bandwidth()/2)
         .attr('y', d => d.yTop - 6)
         .attr('text-anchor', 'middle')
-        .style('font-size', '12px')
+        .style('font-size', '10px')
         .style('fill', d => d.diff >= 0 ? 'green' : 'red')
         .text(d => {
           const sign = d.diff >= 0 ? '+' : '-';
@@ -239,30 +267,47 @@ export default function StackedChart({
       .selectAll('line').attr('stroke','#ccc');
 
     // 14) X축
-    svg.append('g')
+    const xAxisG = svg.append('g')
       .attr('class','x-axis')
       .attr('transform', `translate(${margin.left},${margin.top + yScale(0)})`)
-      .call(d3.axisBottom(xScale))
-      .selectAll('text')
-        .style('cursor','pointer')
-        .on('mouseover', (e, name) => {
-          const r = data.find(d => safeTrim(d.Player).toLowerCase() === name.trim().toLowerCase());
-          if (!r) return;
-          let html = `<strong>${name}</strong><br/>Nation: ${r.Nation}<br/>Squad: ${r.Squad}<br/>Age: ${r.Age}<br/>`;
-          columns.forEach(c => html += `${c}: ${r[c]}<br/>`);
-          d3.select(tooltipRef.current)
-            .html(html)
-            .style('visibility','visible');
-        })
-        .on('mousemove', e => {
-          const rect = containerRef.current.getBoundingClientRect();
-          d3.select(tooltipRef.current)
-            .style('top',  `${e.clientY-rect.top+10}px`)
-            .style('left', `${e.clientX-rect.left+10}px`);
-        })
-        .on('mouseout', () =>
-          d3.select(tooltipRef.current).style('visibility','hidden')
-        );
+      .call(d3.axisBottom(xScale));
+
+    // tick 텍스트 줄바꿈
+    xAxisG.selectAll('text')
+      .style('cursor','pointer')
+      .each(function(name) {
+        const parts = name.split(' ');       // 공백으로 분할
+        const el    = d3.select(this);
+        el.text('');                          // 기존 텍스트 제거
+        parts.forEach((word, i) => {
+          el.append('tspan')
+            .attr('x', 0)
+            // 첫 줄부터 아래로 1.2em 씩 내려주고 싶으면
+            .attr('dy', i === 0 ? '1.2em' : '1.1em')
+            .text(word);
+        });
+      })
+      .on('mouseover', (e, name) => {
+        const r = data.find(d => safeTrim(d.Player).toLowerCase() === name.trim().toLowerCase());
+        if (!r) return;
+        let html = `<strong>${name}</strong><br/>Nation: ${r.Nation}<br/>Team: ${r.Squad}</strong><br/>Position: ${r.Pos}<br/>Age: ${r.Age}<br/>`;
+        columns.forEach(c => {
+          const label = COLUMN_LABELS[c] || c;
+          html += `${label}: ${r[c]}<br/>`;
+        });
+        d3.select(tooltipRef.current)
+          .html(html)
+          .style('visibility','visible');
+      })
+      .on('mousemove', e => {
+        const rect = containerRef.current.getBoundingClientRect();
+        d3.select(tooltipRef.current)
+          .style('top',  `${e.clientY-rect.top-100}px`)
+          .style('left', `${e.clientX-rect.left+10}px`);
+      })
+      .on('mouseout', () =>
+        d3.select(tooltipRef.current).style('visibility','hidden')
+      );
 
     // 15) 구분선
     const recDiffs  = diffs.slice(manualCount);
@@ -288,7 +333,7 @@ export default function StackedChart({
 
     // 16) 범례
     const legend = svg.append('g')
-      .attr('transform', `translate(${margin.left + w - 80},${margin.top + 5})`);
+      .attr('transform', `translate(${margin.left + w - 100},${margin.top + 5})`);
     columns.forEach((col, i) => {
       const g = legend.append('g').attr('transform', `translate(0,${i * 18})`);
       g.append('rect')
@@ -297,8 +342,8 @@ export default function StackedChart({
         .attr('stroke','#333').attr('stroke-width',0.5);
       g.append('text')
         .attr('x',16).attr('y',10)
-        .style('font-size','12px')
-        .text(col);
+        .style('font-size','8px')
+        .text(COLUMN_LABELS[col] || col);
     });
   }
 

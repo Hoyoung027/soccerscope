@@ -9,7 +9,7 @@
 .app-title {
   margin: 0 0 16px 0;
   font-weight: 700;
-  font-size: 36px;
+  font-size: 24px;
   line-height: 1;
   color: #145406;
   white-space: nowrap;
@@ -17,28 +17,43 @@
   text-overflow: ellipsis;
 }
 
+#container {
+	display: flex;
+}
+
 /* 3) 사이드바 + 차트 영역 배치 */
-.container {
+.chart-container {
+  flex: 1;
   display: flex;
   height: 80vh;
 }
 
 /* 4) 사이드바 */
 .sidebar {
-  width: 260px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  padding: 16px;
+  flex: 0 0 260px;
+  padding: 0px;
 }
 
 /* 5) 공통 박스 스타일 */
 .box {
-  width: 250px;
-  border: 3px solid #44753B;
-  border-radius: 20px;
+  width: 230px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
   padding: 16px;
+  background-color: #fafafa;
   box-sizing: border-box;
+  font-size: 14px;
+  font-weight: 100; 
+}
+
+.box-title {
+  margin: 0 0 12px 0;
+  font-weight: 700;
+  font-size: 15px;
+  color: #145406;
+  /* 제목 밑에 구분선 */
+  border-bottom: 1px solid #ccc;
+  padding-bottom: 6px;
 }
 
 /* 6) Categories 박스 */
@@ -55,9 +70,8 @@
   display: flex;
   align-items: center;
   margin-bottom: 8px;
+  gap: 4px;
 }
-
-
 
 /* 8) 현재 플레이어 박스 */
 .current-box {
@@ -94,8 +108,37 @@
 
 /* 9) 차트 영역 */
 .chart-area {
-  flex-grow: 1;
+  flex: 1;
   padding: 16px;
+  height: 100%;
+  box-sizing: border-box;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background-color: #fafafa;
+}
+
+/* 4) SVG가 부모 너비에 꽉 차도록 강제 */
+.chart-area svg {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.player-ticks {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding: 0;
+  list-style: none;
+}
+.player-ticks .tick-line {
+  display: block;
+  line-height: 1.2;
+}
+.player-ticks li {
+  cursor: move;
+  text-align: center;
+  font-size: 12px;
+  user-select: none;
 }
 
 body {
@@ -108,7 +151,7 @@ body {
 .current-box h3,
 .current-list li span,
 .chart-area .legend text {
-  font-weight: 700 !important;
+  font-weight: 400 !important;
 }
 
 /* ───────────────────────────────────────
@@ -121,26 +164,183 @@ body {
   font-weight: 400 !important;
 }
 
-.add-box {
-  border: none;
-  height: 66px;
-  padding: 0;             /* ← 여기서 패딩 제거 */
-  box-sizing: border-box;
+/* 추가된 레이아웃 스타일 */
+.app-container {
+  max-width: 950px;
+  margin: 0 auto;
+  padding-top: 10px;
+  position: relative;
 }
 
-/* 버튼처럼 보이는 입력창 (“pill”) */
-.add-input-pill {
-  box-sizing: border-box;
+.content-container {
+  display: flex;
+  gap: 7px;
+}
+
+.formation-wrapper {
+  flex: none;
+}
+
+.roster-wrapper {
+  flex: none;
+  width: 150px;
+}
+
+.stat-wrapper {
+  flex: none;
+  width: 350px;
+  height: 380px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 16px;
+  background-color: #fafafa;
+}
+
+.stat-wrapper h3 {
+  margin: 0 0 12px 0;
+  font-size: 1.2rem;
+}
+
+.detail-wrapper {
+  position: absolute;
+  top: 30%;
+  left: 60%;
+  transform: translate(-50%, -50%);
+  width: 190px;
+  max-height: 50%;
+  overflow-y: auto;
+  background: rgba(255,255,255,0.98);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  border-radius: 6px;
+  padding: 0;
+  font-size: 12px;
+  z-index: 1000;
+}
+
+.detail-wrapper .drag-handle {
+  cursor: move;
+  background: #205723;
+  color: #fff;
+  padding: 6px 8px;
+  font-weight: bold;
+  border-top-left-radius: 6px;
+  border-top-right-radius: 6px;
+  user-select: none;
+}
+
+.detail-list {
+  margin: 8px;
+}
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.detail-label {
+  font-weight: bold;
+  margin-right: 3px;
+  margin-left: 5px;
+}
+.detail-value {
+  flex: 1;
+}
+.detail-wrapper img {
+  width: 60px;
+  height: 80px;
+  display: block;
+  margin: 6px auto;
+  object-fit: cover;
+}
+
+.detail-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
   width: 100%;
-  height: 50px;           /* Figma 에 맞춘 절대 높이 */
-  line-height: 66px;      /* 텍스트 수직 중앙 */
-  padding: 0 16px;        /* 좌우 여백 */
-  border: 3px solid #44753B;
-  border-radius: 20px;
-  background: white;
+  height: 100%;
+  background: transparent;
+  z-index: 999;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1.4); }
+  50%      { transform: scale(1.43); }
+}
+
+.player-card.selected {
+  animation: pulse 1s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center center;
+}
+
+.teamstat-container {
+  position: relative;
+}
+
+/* Search 버튼 스타일을 참고한 Detail 버튼 */
+.detail-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 6px 12px;
+  background-color: #4d6f34;
+  color: white;
+  font-size: 14px;
+  font-weight: bold;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  transition: background-color 0.2s ease;
+}
+
+.detail-button:hover {
+  background-color: #3b5228;
+}
+
+/* add-box 내부에 입력+버튼 가로 정렬 */
+.add-box {
+  margin: 10px 0;
+  padding: 0;           /* 기존과 비슷하게 박스 여백을 제거 */
+  box-sizing: border-box;
+}
+.add-button-box {
+  display: flex;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  overflow: hidden;     /* 둥근 모서리 유지 */
+  height: 40px;
+  max-width: 230px; 
+}
+/* 왼쪽 – 입력창 */
+.add-input {
+  flex: 1;
+  border: none;
+  padding: 0 10px;
   font-family: 'Pretendard', sans-serif;
   font-weight: 700;
-  font-size: 20px;
-  text-align: center;
+  font-size: 14px;
+  line-height: 40px;
   outline: none;
+  background: white;
+  max-width: 180px; 
+}
+/* 오른쪽 – 버튼 */
+.add-btn {
+  border: none;
+  padding: 0 8px;
+  background-color: #44753B;
+  color: #fff;
+  font-family: 'Pretendard', sans-serif;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  max-width: 100px; 
+}
+.add-btn:hover {
+  background-color: #3b5228;
+}
+
+input[type="checkbox"] {
+  accent-color: #44753B;
 }

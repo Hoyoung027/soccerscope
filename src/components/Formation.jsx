@@ -26,45 +26,44 @@ const Formation = ({ width = 400, height = 300, players = [], onSwap, selectedPl
     e.preventDefault();
     const draggedPlayerId = e.dataTransfer.getData('text/plain');
     console.log('onDrop(필드↔필드 또는 벤치→필드) →', draggedPlayerId, '↔', targetStarterId);
+    console.log(draggedPlayerId);
+    console.log(onSwap);
     if (draggedPlayerId && onSwap) {
       onSwap(draggedPlayerId, targetStarterId);
     }
   };
 
   const handleDragStart = (e, playerId, playerName) => {
-    // 1) 드래그 데이터에 playerId를 저장
+    // 1) 드래그 데이터에 playerId 저장
     e.dataTransfer.setData('text/plain', playerId);
     e.dataTransfer.effectAllowed = 'move';
 
-    // 2) “오프스크린(offscreen)”에 임시 <div> 생성
+    // 2) “선수 이름만” 담은 previewDiv
     const previewDiv = document.createElement('div');
-    previewDiv.style.position = 'absolute';
-    previewDiv.style.top = '-1000px';  // 화면 밖으로 완전히 보냄
-    previewDiv.style.left = '-1000px';
-    previewDiv.style.padding = '4px 8px';
-    previewDiv.style.background = 'white';
-    previewDiv.style.border = '1px solid #333';
-    previewDiv.style.borderRadius = '4px';
-    previewDiv.style.fontSize = '12px';
-    previewDiv.style.fontFamily = 'sans-serif';
-    previewDiv.style.color = '#000';
-    previewDiv.style.pointerEvents = 'none'; // 클릭 등 이벤트 막기
-    previewDiv.innerText = playerName;
+    Object.assign(previewDiv.style, {
+      position: 'absolute',
+      top: '-1000px',
+      left: '-1000px',
+      padding: '4px 8px',
+      background: 'white',
+      border: '1px solid #333',
+      borderRadius: '4px',
+      fontSize: '12px',
+      fontFamily: 'sans-serif',
+      color: '#000',
+      pointerEvents: 'none',
+      whiteSpace: 'nowrap',
+    });
+    previewDiv.textContent = playerName;
 
-    // 문서에 추가해야만 브라우저가 렌더링을 참조해서 setDragImage가 제대로 동작함
     document.body.appendChild(previewDiv);
-
-    // 3) <div> 노드를 드래그 프리뷰로 지정
-    //    (offsetX, offsetY를 0,0으로 주면, div의 좌상단이 커서에 붙습니다.
-    //     필요하면 조정)
-    e.dataTransfer.setDragImage(previewDiv, 0, 0);
-
-    // 4) 즉시(혹은 짧은 딜레이 후) DOM에서 제거
-    //    setTimeout 0이 아니면, 일부 브라우저에서 "setDragImage" 값이 잡히기 전에 삭제될 수 있음
-    setTimeout(() => {
-      document.body.removeChild(previewDiv);
-    }, 0);
-  };
+    e.dataTransfer.setDragImage(
+      previewDiv,
+      previewDiv.offsetWidth  / 2,
+      previewDiv.offsetHeight / 2
+    );
+    setTimeout(() => document.body.removeChild(previewDiv), 100);
+  }
 
   return (
     <svg width={width} height={height}>
@@ -207,13 +206,13 @@ const Formation = ({ width = 400, height = 300, players = [], onSwap, selectedPl
 
         return (
         
-         <g
+          <g
             key={p.id}
             className={isSelected ? 'player-card selected' : 'player-card'}
             transform={transform}
             opacity={opacity}
-            onMouseEnter={() => setHoveredId(p.id)}
-            onMouseLeave={() => setHoveredId(null)}
+            draggable={true}
+            pointerEvents="all"
             onDragStart={(e) => {
               setDraggingId(p.id);
               handleDragStart(e, p.id, p.name);
@@ -221,24 +220,11 @@ const Formation = ({ width = 400, height = 300, players = [], onSwap, selectedPl
             onDragEnd={() => setDraggingId(null)}
             onDragOver={handleDragOver}
             onDrop={(e) => handleDrop(e, p.id)}
+            onMouseEnter={() => setHoveredId(p.id)}
+            onMouseLeave={() => setHoveredId(null)}
             onClick={() => onSelectPlayer(p.id)}
           >
-            {/* 더 넓은 영역에서 드래그 시작할 수 있도록 투명 사각형 도입 */}
-            <rect
-              x={cardX}
-              y={cardY}
-              width={cardWidth}
-              height={cardHeight}
-              fill="transparent"
-              draggable={true}
-              pointerEvents="all"
-              onDragStart={(e) => {
-                setDraggingId(p.id);
-                handleDragStart(e, p.id, p.name);
-              }}
-              onDragEnd={() => setDraggingId(null)}
-            />
-
+            
             {/* ─── A. 카드 배경(포지션별) 그리기 ─── */}
             <image
               href={cardImageUrl}

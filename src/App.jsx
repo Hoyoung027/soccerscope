@@ -1,426 +1,186 @@
-import { useState, useEffect } from 'react';
-import * as d3 from 'd3'
+// src/App.jsx
+import React, { useState, useEffect } from 'react';
+import * as d3 from 'd3';
+import StackedChart from './components/StackedChart';
 import './App.css';
 
+export default function App() {
+  const [rawData, setRawData] = useState(null);
+  const [columns, setColumns] = useState([]);
+  const [baseline, setBaseline] = useState(null);
 
-function App() {
-	// Define state variables.
-	const [items, setItems] = useState([]);
-	const [hovered, setHovered] = useState(null);  
-	const [selected, setSelected] = useState(null);
-	const [trueFilter, setTrueFilter] = useState(null); 
-	const [predFilter, setPredFilter] = useState(null); 
+  // 1) 수동으로 추가한 플레이어
+  const [manualPlayers, setManualPlayers] = useState([]);
+  // 2) 추천 로직으로 생성된 플레이어
+  const [recommendedPlayers, setRecommendedPlayers] = useState([]);
+  const [inputName, setInputName] = useState('');
 
-	useEffect(() => {
-		fetch('predictions.json')
-			.then((response) => response.json())
-			.then((jsonData) => {
-				// Print data into console for debugging.
-				console.log(jsonData);
+  
+  // 차트에 넘길 최종 선수 목록
+  const chartPlayers = [...manualPlayers, ...recommendedPlayers];
 
-				// Save data items to state.
-				setItems(jsonData);
+  // CSV 로드
+  useEffect(() => {
+    d3.csv('/stats.csv').then(data => {
+      setRawData(data);
+      if (data.length) {
+        setManualPlayers([data[0].Player]);
+      }
+    });
+  }, []);
 
-				// Preprocess data.
+  // 수동 추가
+  const handleAddPlayer = () => {
+    const name = inputName.trim();
+    if (!rawData) return;
+    
+    const exists = rawData.find(d => d.Player === name);
+    if (exists && !manualPlayers.includes(name)) {
+      setManualPlayers(mp => [...mp, name]);
+    }
+    setInputName('');
+  };
 
-			})
-			.catch((error) => {
-				console.error('Error loading JSON file:', error);
-			});
-	}, []);
+  // 수동 추가된 선수 또는 추천된 선수를 삭제
+  const handleRemovePlayer = name => {
+    if (manualPlayers.includes(name)) {
+      // 수동 선수 목록에서 삭제
+      setManualPlayers(mp => mp.filter(p => p !== name));
+    } else {
+      // 추천 선수 목록에서 삭제
+      setRecommendedPlayers(rp => rp.filter(p => p !== name));
+    }
+  };
 
-	// Prep.
+  // 카테고리 토글 (최대 5개)
+  const allColumns = [
+    'Gls','Ast','xG','npxG','xAG','G/Sh','KP','PPA','SCA','SCA90',
+    'Sh','Sh/90','SoT','SoT/90','PrgC','Carries','PrgDist_stats_possession','PrgP',
+    'Tkl','Tkl%','Int','Recov'
+  ];
+  const handleToggleColumn = col => {
+    if (columns.includes(col)) {
+      setColumns(cs => cs.filter(x => x !== col));
+    } else if (columns.length < 5) {
+      setColumns(cs => [...cs, col]);
+    } else {
+      alert('카테고리는 최대 5개까지 선택 가능합니다.');
+    }
+  };
 
-	// Projection View
-	useEffect(() => {
-		if (items.length == 0) return;
+  // Dancing 기준 컬럼 토글
+  const handleCategoryClick = col => {
+    setBaseline(b => (b === col ? null : col));
+  };
 
-		const svg = d3.select('#projection-view svg')
-			.attr('width', 370)
-			.attr('height', 330);
+  // 추천 로직
+  useEffect(() => {
+    if (!rawData || manualPlayers.length === 0 || columns.length === 0) {
+      setRecommendedPlayers([]);
+      return;
+    }
+    const base = manualPlayers[0];
+    const baseRow = rawData.find(d => d.Player === base);
+    if (!baseRow) return;
+    const baseMV = +baseRow.market_value;
 
-		svg.selectAll('circle').remove();
+    const higher = rawData.filter(
+      d => !manualPlayers.includes(d.Player) && +d.market_value > baseMV
+    );
+    const lower = rawData.filter(
+      d => !manualPlayers.includes(d.Player) && +d.market_value < baseMV
+    );
 
-		const focus = selected || hovered;
+    const sortByRankSum = arr =>
+      arr
+        .map(d => {
+          const sum = columns.reduce((acc, c) => {
+            const raw = d[`${c}_rank`];
+            // 랭크가 유효한 숫자면 변환, 아니면 Infinity
+            const num = (raw != null && raw !== '')
+              ? +raw
+              : Infinity;
+            return acc + num;
+          }, 0);
+          return { player: d.Player, sum };
+        })
+        .sort((a, b) => a.sum - b.sum)
+        .map(x => x.player);
 
-		const xExtent = d3.extent(items, d => d.projection[0]);
-		const yExtent = d3.extent(items, d => d.projection[1]);
+    const topHigh = sortByRankSum(higher).slice(0, 4);
+    const topLow  = sortByRankSum(lower).slice(0, 4);
 
-		const xScale = d3.scaleLinear()
-		.domain(xExtent).range([20, 350]);
-		
-		const yScale = d3.scaleLinear()
-			.domain(yExtent).range([250, 50]);
+    setRecommendedPlayers([...topHigh, ...topLow]);
+  }, [rawData, manualPlayers, columns]);
 
-		const color = d3.scaleOrdinal()
-			.domain(d3.range(10))
-			.range(d3.schemeCategory10);
-		
-		svg.selectAll('circle')
-			.data(items)
-			.enter()
-			.append('circle')
-				.attr('cx', d => xScale(d.projection[0]))
-				.attr('cy', d => yScale(d.projection[1]))
-				.attr('r', 3)
-				.attr('fill', d => color(d.true_label))
-				.attr('stroke', d => color(d.predicted_label))
-				.attr('stroke-width', 1)
-				.attr('opacity', 0.6)
-				.on('mouseover', (event, d) => setHovered(d))
-				.on('mouseout', () => setHovered(null))
-				.on('click', (event, d) => {
-					setSelected(prev => prev && prev.id === d.id ? null : d);
-				})
-	}, [items]);
+  return (
+    <div className="app">
+      <h1 className="app-title">Player Comparison</h1>
+      <div className="container">
+        <div className="sidebar">
+          {/* Categories */}
+          <div className="box categories-box">
+            <div className="category-list">
+              {allColumns.map(col => (
+                <label key={col} className="category-item">
+                  <input
+                    type="checkbox"
+                    checked={columns.includes(col)}
+                    onChange={() => handleToggleColumn(col)}
+                  />
+                  {col}
+                </label>
+              ))}
+            </div>
+          </div>
 
+          {/* 선수 추가 */}
+          <div className="box add-box">
+            <input
+              className="add-input-pill"
+              type="text"
+              placeholder="선수 이름 입력 후 Enter"
+              value={inputName}
+              onChange={e => setInputName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleAddPlayer()}
+            />
+          </div>
 
-	// Score Distribution 
-	useEffect(() => {
-	if (!items.length) return;
+          {/* 현재 플레이어 (수동 추가 + 추천) */}
+          <div className="box current-box">
+            <h3>플레이어 목록</h3>
+            <ul className="current-list">
+           {[...manualPlayers, ...recommendedPlayers].map(name => {
+             const isRecommended = !manualPlayers.includes(name);
+             return (
+               <li
+                 key={name}
+                 style={{ opacity: isRecommended ? 0.5 : 1 }}
+               >
+                 <span>{name}</span>
+                 <button
+                   className="remove-btn"
+                   onClick={() => handleRemovePlayer(name)}
+                 >─</button>
+               </li>
+             );
+           })}
+            </ul>
+          </div>
+        </div>
 
-	const svg = d3.select('#score-distribution svg')
-		.attr('width', 960)
-		.attr('height', 600);
-	svg.selectAll('*').remove();
-
-	const margin = { top: 30, left: 80, right: 20, bottom: 20 };
-	const width  = +svg.attr('width') - margin.left - margin.right;
-	const height = +svg.attr('height') - margin.top  - margin.bottom;
-	const rowH   = height / 10;
-	const imgS   = 8;
-	const pad    = 2;
-
-	// 상단 축 그리기
-	const xScale = d3.scaleLinear()
-		.domain([0, 1])
-		.range([margin.left, margin.left + width]);
-		
-	const axisG = svg.append('g')
-		.attr('transform', `translate(0,${margin.top})`)
-		.call(d3.axisTop(xScale)
-		.ticks(10)
-		.tickFormat(d3.format('.1f')));
-
-
-	axisG.selectAll('.domain')
-		.attr('stroke', '#ccc');
-
-	axisG.selectAll('line')
- 		.attr('stroke', '#ccc');
-
-	axisG.selectAll('text')
- 		.attr('fill', '#666');
-
-
-	// 클래스별 색상 지정
-	const color = d3.scaleOrdinal()
-		.domain(d3.range(10))
-		.range(d3.schemeCategory10);
-
-	// 눈금 값
-	const tickValues = d3.range(0, 1.01, 0.1);
-
-	// 클래스 0~9 선선 그리기
-	for (let i = 0; i < 10; i++) {
-		const y0 = margin.top + rowH * i + rowH / 2;
-
-		svg.append('line')
-		.attr('x1', margin.left)
-		.attr('x2', margin.left + width)
-		.attr('y1', y0 + 16)
-		.attr('y2', y0 + 16)
-		.attr('stroke', '#ccc');
-
-		// 눈금 추가
-		tickValues.forEach(v => {
-		const x = xScale(v);
-		svg.append('line')
-			.attr('x1', x)
-			.attr('x2', x)
-			.attr('y1', y0 + 16 - 4)
-			.attr('y2', y0 + 16)
-			.attr('stroke', '#ccc');
-		});
-
-		// 텍스트
-		svg.append('text')
-			.attr('x', margin.left - 10)
-			.attr('y', y0 - 6)
-			.attr('text-anchor', 'end')
-			.attr('fill', '#666')
-			.text(`Class ${i}`);
-
-		svg.append('text')
-			.attr('class', 'filter-label')
-			.attr('data-class', i)
-			.attr('x', margin.left - 10)
-			.attr('y', y0 + 4)
-			.attr('text-anchor', 'end')
-			.style('font-size', '10px')
-			.style('cursor','pointer')
-			.text(`Labeled as ${i}`)
-			.on('click', () => setTrueFilter(prev => prev === i ? null : i));
-		
-		svg.append('text')
-			.attr('class', 'filter-pred')
-			.attr('data-class', i)
-			.attr('x', margin.left - 10)
-			.attr('y', y0 + 16)
-			.attr('text-anchor', 'end')
-			.style('font-size', '10px')
-			.style('cursor','pointer')
-			.text(`Predicted as ${i}`)
-			.on('click', () => setPredFilter(prev => prev === i ? null : i));
-
-		// 클래스 데이터 10개로 분할
-		const clsItems = items.filter(d => d.true_label === i);
-		const bins = d3.bin()
-			.domain([0, 1])
-			.thresholds(10)
-			.value(d => d.predicted_scores[i])
-			(clsItems);
-
-
-		// 작은 박스형 이미지들 (col, row) 계산 후 격자 배치
-		bins.forEach(bin => {
-			const x0 = xScale(bin.x0);
-			const bw = xScale(bin.x1) - xScale(bin.x0);
-
-			// 최대 8개 컬럼
-			const maxCols = 8;
-			const nCol = Math.min(maxCols, Math.max(1, Math.floor((bw - pad) / (imgS + pad))));
-
-			bin.forEach((d, idx) => {
-				const col = idx % nCol;
-				const row = Math.floor(idx / nCol);
-
-				// 각 cell의 좌표
-				const cellX = x0 + col * (imgS + pad) + 4;
-				const cellY = (y0+16-imgS-2) - row * (imgS + pad);
-
-				// 배경용 사각형
-				svg.append('rect')
-					.classed('cell', true)
-					.datum(d)
-					.attr('x', cellX)
-					.attr('y', cellY)
-					.attr('width', imgS)
-					.attr('height', imgS)
-					.attr('fill', color(d.true_label))
-					.attr('stroke', color(d.predicted_label))
-					.attr('stroke-width', 1)
-					.on('click', (event, d) => {
-						event.stopPropagation();            
-						setSelected(prev => prev && prev.id === d.id ? null : d);
-						setTrueFilter(null);
-						setPredFilter(null);
-					})
-					.on('mouseover', (e, d) => setHovered(d))
-					.on('mouseout', ()    => setHovered(null));
-					
-
-				// 실제 이미지 삽입 
-				svg.append('image')
-					.classed('cell', true)
-					.datum(d)
-					.attr('href', `/images/${d.filename}`)
-					.attr('x', cellX)
-					.attr('y', cellY)
-					.attr('width', imgS)
-					.attr('height', imgS)
-					.on('click', (event, d) => {
-						event.stopPropagation();
-						setSelected(prev => prev && prev.id === d.id ? null : d);
-						setTrueFilter(null);
-						setPredFilter(null);
-					})
-					.on('mouseover', (e, d) => setHovered(d))
-					.on('mouseout', ()    => setHovered(null));
-			});
-		});
-	}
-	}, [items]);
-
-
-	// Hover, Select, Filter
-	useEffect(() => {
-
-		const focus = selected || hovered;
-
-		 // 1) Projection View
-		d3.select('#projection-view svg').selectAll('circle')
-			.attr('opacity', d => {
-			if (selected) {
-				return d.id === selected.id ? 1 : 0.1;
-			}
-			if (trueFilter !== null) {
-				if (predFilter !== null) {
-				return (d.true_label === trueFilter && d.predicted_label === predFilter)
-					? 1 : 0.1;
-				}
-				return d.true_label === trueFilter ? 1 : 0.1;
-			}
-			if (predFilter !== null) {
-				return d.predicted_label === predFilter ? 1 : 0.1;
-			}
-			if (hovered) {
-				return d.id === hovered.id ? 1 : 0.1;
-			}
-			return 0.6;
-			})
-			.attr('r', d => 
-			selected
-				? (d.id === selected.id ? 6 : 3)
-				: (hovered && d.id === hovered.id ? 6 : 3)
-			);
-
-		// 2) Score Distribution View
-		d3.select('#score-distribution svg').selectAll('rect.cell, image.cell')
-			.attr('opacity', d => {
-			if (selected) {
-				return d.id === selected.id ? 1 : 0.1;
-			}
-			if (trueFilter !== null) {
-				if (predFilter !== null) {
-				return (d.true_label === trueFilter && d.predicted_label === predFilter)
-					? 1 : 0.1;
-				}
-				return d.true_label === trueFilter ? 1 : 0.1;
-			}
-			if (predFilter !== null) {
-				return d.predicted_label === predFilter ? 1 : 0.1;
-			}
-			if (hovered) {
-				return d.id === hovered.id ? 1 : 0.1;
-			}
-			return 1;
-			});
-
-			d3.selectAll('.filter-label')
-				.style('text-decoration', function() {
-					return +d3.select(this).attr('data-class') === trueFilter
-					? 'underline'
-					: 'none';
-				});
-
-			d3.selectAll('.filter-pred')
-				.style('text-decoration', function() {
-					return +d3.select(this).attr('data-class') === predFilter
-					? 'underline'
-					: 'none';
-				});
-
-	}, [hovered, selected, trueFilter, predFilter]);
-
-	useEffect(() => {
-		const ssvg = d3.select('#score-distribution svg');
-		ssvg.selectAll('.focus-line').remove();
-
-		// selected, hovered 일 경우 그래프 표시가 목표
-		const focus = selected || hovered;
-		if (!focus) return;
-
-		// 레이아웃 연산산
-		const margin = { top: 30, left: 80, right: 20, bottom: 20 };
-		const svgW = +ssvg.attr('width');
-		const svgH = +ssvg.attr('height');
-		const width = svgW - margin.left - margin.right;
-		const height = svgH - margin.top  - margin.bottom;
-		const rowH = height / 10;
-
-		// xScale 정의
-		const xScale = d3.scaleLinear()
-			.domain([0, 1])
-			.range([margin.left, margin.left + width]);
-
-		// line 생성기 
-		const lineGen = d3.line()
-			.x(d => xScale(d))
-			.y((d, i) => 
-				margin.top     
-				+ rowH * (i-1)    
-				+ rowH / 2    
-				+ 16          
-			)
-			.curve(d3.curveStepBefore);
-
-		// path 그리기기
-		ssvg.append('path')
-			.datum(focus.predicted_scores)
-			.attr('class', 'focus-line')
-			.attr('d', lineGen)
-			.attr('stroke', 'black')
-			.attr('stroke-width', 1.5)
-			.attr('fill', 'none');
-
-		const score9 = focus.predicted_scores[9];
-		const x9 = xScale(score9);
-
-		// 클래스 9는 별도로 추가 도입
-		const yCenter9 = margin.top + rowH * 9 + rowH / 2 + 16;
-		ssvg.append('line')
-			.attr('class', 'focus-line')
-			.attr('x1', x9).attr('x2', x9)
-			.attr('y1', yCenter9 - rowH/2 - 28)
-			.attr('y2', yCenter9 + rowH/2 - 28)
-			.attr('stroke', 'black')
-			.attr('stroke-width', 1.5);
-
-	}, [selected, hovered]);
-
-
-	return (
-	<>
-		<h1>Data Visualization HW 3</h1>
-
-		<div id="container">
-		<div id="sidebar">
-			<div id="projection-view" className="view-panel">
-			<div className="view-title">Projection View</div>
-			<svg />
-			</div>
-			<div id="selected-image-info" className="view-panel">
-			<div className="view-title">Selected Image</div>
-			<div id="selected-image-info-content">
-				{ (selected || hovered) ? (() => {
-					const focus = selected || hovered;
-					return (
-					<>
-						<img 
-						src={`/images/${focus.filename}`} 
-						width={80} 
-						height={80} 
-						alt={`img-${focus.id}`} 
-						/>
-						<div className="selected-info">
-						<div className="info-line">ID: {focus.id}</div>
-						<div className="info-line">Labeled as {focus.true_label}</div>
-						<div className="info-line">
-							Predicted as {focus.predicted_label}
-							<span className="confidence">
-							&nbsp;(Confidence: {focus.predicted_scores[focus.predicted_label].toFixed(3)})
-							</span>
-						</div>
-						</div>
-						<svg id="parallel-coords" width={80} height={100} />
-					</>
-					);
-				})()
-				: null }
-			</div>
-			</div>
-		</div>
-
-		<div id="main-section">
-			<div id="score-distribution" className="view-panel">
-			<div className="view-title">Score Distributions</div>
-			<svg />
-			</div>
-		</div>
-		</div>
-	</>
-	);
+        {/* 차트 */}
+        <div className="chart-area">
+          <StackedChart
+            data={rawData}
+            players={chartPlayers}
+            columns={columns}
+            baseline={baseline}
+            onCategoryClick={handleCategoryClick}
+            manualCount={manualPlayers.length}
+          />
+        </div>
+      </div>
+    </div>
+  );
 }
-
-export default App;

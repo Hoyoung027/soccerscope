@@ -1,72 +1,146 @@
-html, body {
-	position: relative;
-	width: 100%;
-	height: 100%;
+/* 1) 최상위 래퍼: 가로폭 제한 & 가운데 정렬 */
+.app {
+  max-width: 1200px;
+  margin: 40px auto;
+  font-family: 'Pretendard', sans-serif;
+}
+
+/* 2) 제목: 한 줄 고정 */
+.app-title {
+  margin: 0 0 16px 0;
+  font-weight: 700;
+  font-size: 36px;
+  line-height: 1;
+  color: #145406;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 3) 사이드바 + 차트 영역 배치 */
+.container {
+  display: flex;
+  height: 80vh;
+}
+
+/* 4) 사이드바 */
+.sidebar {
+  width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 16px;
+}
+
+/* 5) 공통 박스 스타일 */
+.box {
+  width: 250px;
+  border: 3px solid #44753B;
+  border-radius: 20px;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+/* 6) Categories 박스 */
+.categories-box {
+  height: 280px;
+  display: flex;
+  flex-direction: column;
+}
+.category-list {
+  flex-grow: 1;
+  overflow-y: auto;
+}
+.category-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+
+
+/* 8) 현재 플레이어 박스 */
+.current-box {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+}
+.current-box h3 {
+  margin: 0 0 12px 0;
+}
+.current-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  overflow-y: auto;
+}
+.current-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.remove-btn {
+  width: 24px;
+  height: 24px;
+  border: 1px solid #aaa;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0;
+}
+
+/* 9) 차트 영역 */
+.chart-area {
+  flex-grow: 1;
+  padding: 16px;
 }
 
 body {
-	color: #333;
-	margin: 0;
-	padding: 12px;
-	box-sizing: border-box;
-	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+  background-color: #FCFDF3;
 }
 
-#container {
-	display: flex;
+.sidebar .category-item,
+.add-button-box .add-btn,
+.add-button-box .add-input,
+.current-box h3,
+.current-list li span,
+.chart-area .legend text {
+  font-weight: 700 !important;
 }
 
-h1 {
-	font-size: 1.3rem;
-	font-weight: 500;
-	margin-top: 4px;
-	padding-left: 4px;
+/* ───────────────────────────────────────
+   차트 내부 텍스트 (축 레이블, 선수 이름, 툴팁 등)
+   Pretendard 400 (Regular)
+─────────────────────────────────────── */
+.chart-area svg text,
+.chart-area .x-axis text,
+.chart-area .y-axis text {
+  font-weight: 400 !important;
 }
 
-#sidebar {
-	display: flex;
-	flex-direction: column;
-	width: 450px;
+.add-box {
+  border: none;
+  height: 66px;
+  padding: 0;             /* ← 여기서 패딩 제거 */
+  box-sizing: border-box;
 }
 
-#main-section {
-	display: flex;
-	flex-direction: column;
-	width: 1000px;
-}
-
-.view-panel {
-	border: 2px solid #eee;
-	margin-bottom: 15px;
-	margin-right: 15px;
-}
-
-.view-title {
-	font-size: 1.0rem;
-	background-color: #f3f3f3;
-	padding: 3px 8px 5px 12px;
-	margin-bottom: 8px;
-}
-
-#selected-image-info-content {
-	height: 100px;
-	padding: 16px;
-	display: flex;
-}
-
-.selected-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  color: black;
-}
-
-.info-line {
-  font-size: 13px;
-  color: black;
-}
-
-.confidence {
-  color: #333;
-  font-size: 11px;
+/* 버튼처럼 보이는 입력창 (“pill”) */
+.add-input-pill {
+  box-sizing: border-box;
+  width: 100%;
+  height: 50px;           /* Figma 에 맞춘 절대 높이 */
+  line-height: 66px;      /* 텍스트 수직 중앙 */
+  padding: 0 16px;        /* 좌우 여백 */
+  border: 3px solid #44753B;
+  border-radius: 20px;
+  background: white;
+  font-family: 'Pretendard', sans-serif;
+  font-weight: 700;
+  font-size: 20px;
+  text-align: center;
+  outline: none;
 }

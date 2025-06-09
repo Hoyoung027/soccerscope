@@ -107,10 +107,11 @@ export default function App() {
   // 2) 추천 로직으로 생성된 플레이어
   const [recommendedPlayers, setRecommendedPlayers] = useState([]);
   const [inputName, setInputName] = useState('');
+  const [suggestions, setSuggestions]   = useState([]);  // <-- 자동완성 목록
 
   // 차트에 넘길 최종 선수 목록
   const chartPlayers = [...manualPlayers, ...recommendedPlayers];
-
+  
   useEffect(() => {
     setStatsLoading(true);
     setStatsError(null);
@@ -511,6 +512,34 @@ export default function App() {
   const handleShowClubDetail = () => setShowClubDetail(true);
   const handleCloseClubDetail = () => setShowClubDetail(false);
   
+  // 검색창에 타이핑할 때마다 호출
+  const handleInputChange = (e) => {
+    const q = e.target.value;
+    setInputName(q);
+
+    if (!rawData || q.trim() === '') {
+      setSuggestions([]);
+      console.log('입력 비었음 → suggestions 초기화');
+    } else {
+      const lower = q.trim().toLowerCase();
+      const matches = rawData
+        .filter(d => d.Player.toLowerCase().includes(lower))
+        .slice(0, 5)
+        .map(d => d.Player);
+      console.log('filtered matches:', matches);
+      setSuggestions(matches);
+    }
+  };
+
+  // 리스트에서 클릭했을 때
+  const handleSelectSuggestion = (name) => {
+    if (rawData.find(d => d.Player === name) && !manualPlayers.includes(name)) {
+      setManualPlayers(mp => [...mp, name]);
+    }
+    setInputName('');
+    setSuggestions([]);
+  };
+
   // 수동 추가
   const handleAddPlayer = () => {
     const name = inputName.trim();
@@ -715,21 +744,41 @@ export default function App() {
               </div>
 
               <div className="add-box">
-                <div className="add-button-box">
+                {/* position:relative 반드시 확인 */}
+                <div className="add-button-box" style={{ position: 'relative' }}>
                   <input
                     className="add-input"
                     type="text"
                     placeholder="Search the Player"
                     value={inputName}
-                    onChange={e => setInputName(e.target.value)}
+                    onChange={handleInputChange}
                     onKeyDown={e => e.key === 'Enter' && handleAddPlayer()}
                   />
                   <button
                     className="add-btn"
-                    onClick={handleAddPlayer}
+                    onClick={() => {
+                      handleAddPlayer();
+                      setSuggestions([]);          // 버튼 클릭시에도 추천창 닫기
+                    }}
                   >
                     Search
                   </button>
+
+                  <div className="suggestions">
+                    {suggestions.map(name => (
+                      <div
+                        key={name}
+                        className="suggestion-item"
+                        onClick={() => {
+                          setManualPlayers(mp => [...mp, name]);
+                          setInputName('');
+                          setSuggestions([]);
+                        }}
+                      >
+                        {name}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
 

@@ -1,0 +1,71 @@
+/* src/components/Header.css */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 20px;
+  background-color: #205723;
+  color: white;
+  margin-bottom: 10px;
+}
+
+.logo {
+  font-size: 1.2rem;
+}
+
+.input-wrapper {
+  position: relative; 
+}
+
+.search-form {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-input {
+  padding: 4px 8px;
+  border-radius: 4px 0 0 4px;
+  border: 1px solid #ccc;
+  font-size: 0.9rem;
+  width: 200px;
+  outline: none;
+}
+
+.search-button {
+  padding: 5px 12px;
+  border: none;
+  background-color: #3F7D2A;
+  color: white;
+  border-radius: 0 4px 4px 0;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.autocomplete {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  background: white;
+  border: 1px solid #ccc;
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  z-index: 1000;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.autocomplete li {
+  padding: 8px 12px;
+  font-size: 0.7rem;
+  color: black;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.autocomplete li:hover {
+  background-color: #E8F2E8;
+}

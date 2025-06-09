@@ -9,6 +9,7 @@ import PlayerDetail from './components/PlayerDetail';
 import TeamDetail from './components/TeamDetail';
 import Draggable from 'react-draggable';     
 import StackedChart from './components/StackedChart';
+import TeamAnalysis from './components/TeamAnalysis';
 import './App.css';
 
 const POSITION_COORDS_433 = {
@@ -68,6 +69,7 @@ export default function App() {
 
   // stats.csv에서 팀별로 집계한 결과를 저장
   const [teamAggregates, setTeamAggregates] = useState({});
+  const teamNames = Object.keys(teamAggregates);
 
   // 에러 확인용
   const [statsLoading, setStatsLoading] = useState(false);
@@ -75,7 +77,6 @@ export default function App() {
   const [playersLoading, setPlayersLoading] = useState(false);
   const [playersError, setPlayersError]     = useState(null);
   
-
   // 선수 detail
   const [allPlayerStats, setAllPlayerStats] = useState([]);    
   const [selectedPlayerId, setSelectedPlayerId] = useState(null); 
@@ -90,17 +91,21 @@ export default function App() {
   const [playersIn433, setPlayersIn433] = useState([]); 
   const [teamPlayers, setTeamPlayers] = useState([]);
 
-  const [rawData, setRawData] = useState(null);
+  const [rawData, setRawData] = useState([]);
   const [columns, setColumns] = useState([]);
   const [baseline, setBaseline] = useState(null);
 
-  const [origLineupStats, setOrigLineupStats] = useState(null);
-  const [origMv, setOrigMv]  = useState(0);
   const [lineupDiffStats, setLineupDiffStats] = useState({});
   const [diffMv, setDiffMv] = useState(0);
   const [showImpactModal, setShowImpactModal] = useState(false);
   const impactRef = useRef(null);
   const [swapInfo, setSwapInfo] = useState({ out: '', in: '' });
+
+  // 팀 내 선수 비교
+  const [showAnalysisModal, setShowAnalysisModal] = useState(false);
+  const [chartType, setChartType] = useState('heatmap');
+  const [compareKey, setCompareKey] = useState('Gls');
+  const [selectedCategory, setSelectedCategory] = useState('FW');
 
   // 1) 수동으로 추가한 플레이어
   const [manualPlayers, setManualPlayers] = useState([]);
@@ -614,12 +619,17 @@ export default function App() {
     setRecommendedPlayers([...topHigh, ...topLow]);
   }, [rawData, manualPlayers, columns]);
   
+
+
   return (
     <div className="app-container">
       {/* ===========================
           1) Header & 검색
       =========================== */}
-      <Header onSearch={handleTeamSearch} />
+      <Header
+        onSearch={handleTeamSearch}
+        teamList={teamNames}
+      />
 
       <div className="content-container">
         {/* ===========================
@@ -655,11 +665,117 @@ export default function App() {
               onSwap={handleSwap}
               selectedPlayerId={selectedPlayerId}
               onSelectPlayer={handleSelectPlayer}
+              onAnalysis={() => setShowAnalysisModal(true)} 
             />
           )}
 
           {!playersLoading && !playersError && playersIn433.length === 0 && (
             <p>“{teamName}” 팀의 선수 정보를 찾을 수 없습니다.</p>
+          )}
+
+          {showClubDetail && (
+            <>
+              <div className="detail-overlay" onClick={handleCloseClubDetail} />
+              <Draggable nodeRef={detailRef} handle=".drag-handle">
+                <div className="detail-wrapper" ref={detailRef}>
+                  <div className="drag-handle">
+                    Detail
+                    <button
+                      style={{
+                        float: 'right',
+                        border: 'none',
+                        background: 'transparent',
+                        cursor: 'pointer'
+                      }}
+                      onClick={handleCloseClubDetail}
+                    >✕</button>
+                  </div>
+                  <TeamDetail
+                    clubStat={allClubStats.find(d => d.name.trim() === teamName)}
+                    teamAggregates={teamAggregates[teamName]}
+                    selectedTeam={teamName}
+                  />
+                </div>
+              </Draggable>
+            </>
+          )}
+
+          {showAnalysisModal && (
+            <>
+              {/* 배경 클릭하면 닫힘 */}
+              <div className="detail-overlay" onClick={setShowAnalysisModal} />
+              <Draggable nodeRef={detailRef} handle=".drag-handle">
+              <div className="detail-graph-wrapper" ref={detailRef}>
+                <div className="drag-handle">
+                  Squad Analysis
+                  <button
+                    onClick={() => setShowAnalysisModal(false)}
+                    style={{
+                      float: 'right',
+                      border: 'none',
+                      background: 'transparent',
+                      cursor: 'pointer'
+                    }}
+                  >✕</button>
+                </div>
+
+                <div style={{ padding: '8px 16px', display: 'flex', gap: '12px' }}>
+                  
+                  <label>
+                    Chart Option:
+                    <select
+                      value={chartType}
+                      onChange={e => setChartType(e.target.value)}
+                      style={{ marginLeft: '4px' }}
+                    >
+                      <option value="heatmap">heatmap</option>
+                      <option value="bar">bar</option>
+                    </select>
+                  </label>
+
+                  <label>
+                    Stat:
+                    <select
+                      value={compareKey}
+                      onChange={e => setCompareKey(e.target.value)}
+                      style={{ marginLeft: '4px' }}
+                    >
+                      {Object.keys(COLUMN_LABELS).map(key => (
+                        <option key={key} value={key}>
+                          {COLUMN_LABELS[key] || key}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  
+                  {chartType === 'bar' && (
+                    <label>
+                      Position:
+                      <select
+                        value={selectedCategory}
+                        onChange={e => setSelectedCategory(e.target.value)}
+                        style={{ marginLeft: '4px' }}
+                      >
+                        <option value="FW">Attack</option>
+                        <option value="MF">Midfield</option>
+                        <option value="DF">Defense</option>
+                      </select>
+                    </label>
+                  )}
+                </div>
+                <TeamAnalysis
+                  chartType={chartType}
+                  rawData={rawData}
+                  teamName={teamName}
+                  compareKey={compareKey}
+                  selectedCategory={selectedCategory}
+                  width={700}
+                  height={350}
+                />
+              </div>
+              </Draggable>
+
+            </>
           )}
         </div>
 

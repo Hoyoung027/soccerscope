@@ -244,6 +244,22 @@ body {
 .detail-value {
   flex: 1;
 }
+
+.detail-label.incoming {
+  color: #0074D9;
+}
+.detail-label.outgoing {
+  color: #FF4136;
+}
+
+
+.detail-value.incoming {
+  color: #0074D9;
+}
+.detail-value.outgoing {
+  color: #FF4136;
+}
+
 .detail-wrapper img {
   width: 60px;
   height: 80px;

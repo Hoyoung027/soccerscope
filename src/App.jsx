@@ -391,40 +391,6 @@ export default function App() {
     });
   }, []);
 
-  useEffect(() => {
-      if (!rawData || playersIn433.length === 0) return;
-
-      // 합산할 스탯 키들
-      const keys = ['Gls','xG','xAG','SoT','Int','Recov'];
-      // 현 라인업 스탯 합계
-      const currStats = keys.reduce((acc, k) => {
-        acc[k] = playersIn433
-          .map(p => rawData.find(d => d.Player_Id === p.id)?.[k] || 0)
-          .reduce((s, v) => s + v, 0);
-        return acc;
-      }, {});
-      // 현 라인업 마켓값 합계
-      const currMv = playersIn433
-        .map(p => rawData.find(d => d.Player_Id === p.id)?.market_value || 0)
-        .reduce((s,v) => s + v, 0);
-
-      // 최초 호출 시 origLineupStats/origMv에 저장
-      if (!origLineupStats) {
-        setOrigLineupStats(currStats);
-        setOrigMv(currMv);
-        return;
-      }
-
-      // ③ 변화량 계산
-      const diffStats = keys.reduce((acc, k) => {
-        acc[k] = currStats[k] - (origLineupStats[k] || 0);
-        return acc;
-      }, {});
-      setLineupDiffStats(diffStats);
-
-      const deltaMv = currMv - origMv;
-      setDiffMv(deltaMv);
-    }, [playersIn433, rawData]);
 
   // 사용자가 헤더에서 검색을 눌렀을 때 팀명을 받아와서 상태를 변경
   const handleTeamSearch = (searchTerm) => {
@@ -501,6 +467,19 @@ export default function App() {
       out: oldStarter.name, 
       in: benchPlayer.Player 
     });
+
+    // (B) Stats, Market Value 차이 계산
+    const KEYS = ['Gls','xG','xAG','SoT','Int','Recov'];
+    const diffStats = {};
+    KEYS.forEach(k => {
+      const oldVal = rawData.find(d => d.Player_Id === oldStarter.id)?.[k] || 0;
+      const newVal = rawData.find(d => d.Player_Id === benchPlayer.Player_Id)?.[k] || 0;
+      diffStats[k] = newVal - oldVal;
+    });
+    setLineupDiffStats(diffStats);
+
+    const oldMv = rawData.find(d => d.Player_Id === oldStarter.id)?.market_value || 0;
+    setDiffMv(benchPlayer.market_value - oldMv);
 
     // 벤치 선수를 새로 “스타터” 정보로 매핑:  
     // oldStarter.x, oldStarter.y, oldStarter.posType를 그대로 물려받음
@@ -874,13 +853,13 @@ export default function App() {
               <div style={{ padding: '8px' }}>
                 
                 <div className="detail-row">
-                  <span className="detail-label">In: </span>
-                  <span className="detail-value">{swapInfo.in}</span>
+                  <span className="detail-label incoming ">In: </span>
+                  <span className="detail-value incoming">{swapInfo.in}</span>
                 </div>
 
                 <div className="detail-row">
-                  <span className="detail-label">Out: </span>
-                  <span className="detail-value">{swapInfo.out}</span>
+                  <span className="detail-label outgoing">Out: </span>
+                  <span className="detail-value outgoing">{swapInfo.out}</span>
                 </div>
               
                 <div

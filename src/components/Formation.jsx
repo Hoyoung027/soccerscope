@@ -233,6 +233,7 @@ const Formation = ({ width = 400, height = 300, players = [], onSwap, selectedPl
               width={cardWidth}
               height={cardHeight}
               preserveAspectRatio="xMidYMid slice"
+              style={{ filter: 'drop-shadow(0px 4px 6px rgba(0,0,0,0.5))' }}
             />
             
             {/* 선수 이미지 */}

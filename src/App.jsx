@@ -30,29 +30,39 @@ const parseValue = (val) => {
 };
 
 const COLUMN_LABELS = {
-  Gls:   '골',
-  Ast:   '어시스트 횟수',
-  xG:    '골 기대치',
-  npxG:  '페널티킥 제외 골 기대치',
-  xAG:   '어시스트 기대치',
-  'G/Sh':'슈팅당 득점률',
-  KP:    '키 패스 횟수',
-  PPA:   '박스 진입 패스 수',
-  SCA:   '슛 기여 행동 수',
-  SCA90: '경기당 평균 슛 기여 행동 수',
-  Sh:    '총 슛 수',
-  'Sh/90':'경기당 평균 슛 수',
-  SoT:   '유효 슛 수',
-  'SoT/90':'경기당 평균 유효 슛 수',
-  PrgC:  '전진 드리블 수',
-  Carries: '드리블 수',
-  PrgDist_stats_possession:'드리블 이동 거리',
-  PrgP:  '전진 패스 수',
-  Tkl:   '태클 수',
-  'Tkl%':'태클 성공률',
-  Int:   '인터셉트 수',
-  Recov: '볼 리커버리 수'
+  Gls:   'Goals',
+  Ast:   'Number of assists',
+  xG:    'Expected goals(xG)',
+  npxG:  'Non-penalty xG',
+  xAG:   'Expected assists(xAG)',
+  'G/Sh':'Goals per shot(G/Sh)',
+  KP:    'Key passes(KP)',
+  PPA:   'Passes into penalty area',
+  SCA:   'Shot-creating actions',
+  SCA90: 'SCA per 90 minutes',
+  Sh:    'Total shots',
+  'Sh/90':'Shots per 90 minutes',
+  SoT:   'Shots on target(SoT)',
+  'SoT/90':'SoT per 90 minutes',
+  PrgC:  'Progressive carries',
+  Carries: 'carries',
+  PrgDist_stats_possession: 'Progressive distance',
+  PrgP:  'Progressive passes',
+  Tkl:   'Tackles(Tkl)',
+  'Tkl%':'Tackle success rate',
+  Int:   'Interceptions(Int)',
+  Recov: 'Ball recoveries'
 };
+
+const FIELD_LABELS_STATS = {
+  total_market_value:'Market Value',
+  Gls:'Goals',
+  xG:'Expected Goals (xG)',
+  xAG:'Expected Assists (xAG)',
+  SoT:'Shots on Target (SoT)',
+  Int:'Interceptions (Int)',
+  Recov:'Recoveries',
+}
 
 export default function App() {
 
@@ -64,6 +74,7 @@ export default function App() {
   const [statsError, setStatsError] = useState(null);
   const [playersLoading, setPlayersLoading] = useState(false);
   const [playersError, setPlayersError]     = useState(null);
+  
 
   // 선수 detail
   const [allPlayerStats, setAllPlayerStats] = useState([]);    
@@ -83,6 +94,14 @@ export default function App() {
   const [columns, setColumns] = useState([]);
   const [baseline, setBaseline] = useState(null);
 
+  const [origLineupStats, setOrigLineupStats] = useState(null);
+  const [origMv, setOrigMv]  = useState(0);
+  const [lineupDiffStats, setLineupDiffStats] = useState({});
+  const [diffMv, setDiffMv] = useState(0);
+  const [showImpactModal, setShowImpactModal] = useState(false);
+  const impactRef = useRef(null);
+  const [swapInfo, setSwapInfo] = useState({ out: '', in: '' });
+
   // 1) 수동으로 추가한 플레이어
   const [manualPlayers, setManualPlayers] = useState([]);
   // 2) 추천 로직으로 생성된 플레이어
@@ -100,6 +119,7 @@ export default function App() {
       .then((data) => {
         // --- 데이터 파싱 & 집계 ---
         data.forEach(d => {
+          d.Player_Id = +d.Player_Id;  
           d.Age     = +parseInt(d.Age, 10) || 0;
           d.market_value = parseInt(d.market_value, 10) || 0;
           d.total_minutes = +d.total_minutes;
@@ -162,6 +182,10 @@ export default function App() {
 
     d3.csv('/stats.csv')
       .then((data) => {
+
+        data.forEach(d => {
+          d.Player_Id = +d.Player_Id; 
+        })
 
         const teamPlayers = data.filter(
           (p) => p.Squad === teamName
@@ -367,6 +391,7 @@ export default function App() {
     });
   }, []);
 
+
   // 사용자가 헤더에서 검색을 눌렀을 때 팀명을 받아와서 상태를 변경
   const handleTeamSearch = (searchTerm) => {
     setTeamName(searchTerm);
@@ -376,19 +401,29 @@ export default function App() {
   const handleSwap = (draggedPlayerId, targetStarterId) => {
 
     // Foramation 내에서의 swap, Roster 선수와의 Swap을 구분
-    const isDraggedInField = playersIn433.some((p) => p.id === draggedPlayerId);
-    const isTargetInField  = playersIn433.some((p) => p.id === targetStarterId);
+    // const isDraggedInField = playersIn433.some((p) => p.id === draggedPlayerId);
+    // const isTargetInField  = playersIn433.some((p) => p.id === targetStarterId);
+    
+    const draggedIdNum = Number(draggedPlayerId);
+    const targetIdNum  = Number(targetStarterId);
+
+    const isDraggedInField = playersIn433.some(p => p.id === draggedIdNum);
+    const isTargetInField  = playersIn433.some(p => p.id === targetIdNum);
 
     // Formation 내에서의 swap
     if (isDraggedInField && isTargetInField) {
       //  → 두 필드 선수를 교환(swap)
       const fieldCopy = [...playersIn433];
       // ① 두 선수의 인덱스를 찾고
-      const idxDragged = fieldCopy.findIndex((p) => p.id === draggedPlayerId);
-      const idxTarget  = fieldCopy.findIndex((p) => p.id === targetStarterId);
+      // const idxDragged = fieldCopy.findIndex((p) => p.id === draggedPlayerId);
+      // const idxTarget  = fieldCopy.findIndex((p) => p.id === targetStarterId);
+      
+      const idxDragged = fieldCopy.findIndex(p => p.id === draggedIdNum);
+      const idxTarget  = fieldCopy.findIndex(p => p.id === targetIdNum);
+      
       if (idxDragged < 0 || idxTarget < 0) return;
 
-      // ② 두 객체의 x,y 값을 서로 바꿔준다
+      // 두 객체의 x,y 값을 서로 바꿔준다
       const tempX = fieldCopy[idxDragged].x;
       const tempY = fieldCopy[idxDragged].y;
       const tempPosType = fieldCopy[idxDragged].posType;
@@ -409,14 +444,42 @@ export default function App() {
     }
 
     // Roster와 Formation 간의 swap
-
     // 드롭된 “스타터”의 기존 정보를 playersIn433에서 꺼내기
-    const oldStarter = playersIn433.find((p) => p.id === targetStarterId);
-    if (!oldStarter) return;
+    // const oldStarter = playersIn433.find((p) => p.id === targetStarterId);
+    const oldStarter = playersIn433.find(p => p.id === targetIdNum);
+    if (!oldStarter) {
+      return;
+    }
 
     // 벤치(로스터)에서 드래그해 온 선수(원본 full 객체)를 teamPlayers에서 찾기
-    const benchPlayer = teamPlayers.find((p) => p.Player_Id === draggedPlayerId);
-    if (!benchPlayer) return;
+    // const benchPlayer = teamPlayers.find((p) => p.Player_Id === draggedPlayerId);
+    let benchPlayer = teamPlayers.find(p => p.Player_Id === draggedIdNum);
+
+    if (!benchPlayer) {
+      benchPlayer = rawData.find(d => d.Player_Id === draggedIdNum);    
+    }
+
+    if(!benchPlayer) {
+      return;
+    }
+
+    setSwapInfo({ 
+      out: oldStarter.name, 
+      in: benchPlayer.Player 
+    });
+
+    // (B) Stats, Market Value 차이 계산
+    const KEYS = ['Gls','xG','xAG','SoT','Int','Recov'];
+    const diffStats = {};
+    KEYS.forEach(k => {
+      const oldVal = rawData.find(d => d.Player_Id === oldStarter.id)?.[k] || 0;
+      const newVal = rawData.find(d => d.Player_Id === benchPlayer.Player_Id)?.[k] || 0;
+      diffStats[k] = newVal - oldVal;
+    });
+    setLineupDiffStats(diffStats);
+
+    const oldMv = rawData.find(d => d.Player_Id === oldStarter.id)?.market_value || 0;
+    setDiffMv(benchPlayer.market_value - oldMv);
 
     // 벤치 선수를 새로 “스타터” 정보로 매핑:  
     // oldStarter.x, oldStarter.y, oldStarter.posType를 그대로 물려받음
@@ -430,15 +493,16 @@ export default function App() {
       posType: oldStarter.posType,
     };
 
-    // ④ 새로운 playersIn433 배열 생성:  
-    //    - oldStarter는 빼고(newStarter로 대체),  
-    //    - 나머지 스타터는 그대로
+    // 새로운 playersIn433 배열 생성:  
     const updatedStarters = playersIn433.map((p) =>
-      p.id === targetStarterId ? newStarter : p
+      // p.id === targetStarterId ? newStarter : p
+      p.id === targetIdNum ? newStarter : p
     );
 
     setPlayersIn433(updatedStarters);
+    setShowImpactModal(true);
   };
+
 
   const handleSelectPlayer = (playerId) => {
     setSelectedPlayerId(playerId);
@@ -467,6 +531,16 @@ export default function App() {
       setManualPlayers(mp => [...mp, player.Player]);
     }
   };
+
+  const handlePlayerListDrop = e => {
+    e.preventDefault();
+    const draggedId = e.dataTransfer.getData('text/plain');
+    const player = teamPlayers.find(p => String(p.Player_Id) === String(draggedId));
+    if (player && !manualPlayers.includes(player.Player)) {
+      setManualPlayers(mp => [...mp, player.Player]);
+    }
+  };
+
 
   // 수동 추가된 선수 또는 추천된 선수를 삭제
   const handleRemovePlayer = name => {
@@ -589,6 +663,8 @@ export default function App() {
           )}
         </div>
 
+
+
         {/* ===========================
             4) Team Stat + Detail
         =========================== */}
@@ -660,11 +736,23 @@ export default function App() {
 
               <div className="box current-box">
                 <h3 className="box-title">Player list</h3>
-                <ul className="current-list">
+                <ul className="current-list"
+                   onDragOver={e => e.preventDefault()}
+                   onDrop={handleRosterDrop}
+                >
                   {[...manualPlayers, ...recommendedPlayers].map(name => {
                     const isRec = !manualPlayers.includes(name);
+                    const row = rawData.find(d => d.Player === name);
+                    const playerId = row ? row.Player_Id : '';
                     return (
-                      <li key={name} style={{ opacity: isRec ? 0.5 : 1 }}>
+                      <li 
+                        key={name} 
+                        style={{ opacity: isRec ? 0.5 : 1 }}
+                        draggable
+                        onDragStart={e => {
+                          e.dataTransfer.setData('text/plain', playerId);
+                        }}
+                      >
                         <span>{name}</span>
                         <button
                           className="remove-btn"
@@ -739,6 +827,63 @@ export default function App() {
                 teamAggregates={teamAggregates[teamName]}
                 selectedTeam={teamName}
               />
+            </div>
+          </Draggable>
+        </>
+      )}
+
+      {showImpactModal && (
+        <>
+          <div className="detail-overlay" onClick={() => setShowImpactModal(false)} />
+          <Draggable nodeRef={impactRef} handle=".drag-handle">
+            <div className="detail-wrapper" ref={impactRef}>
+              <div className="drag-handle">
+                Squad Switch Impact
+                <button
+                  style={{
+                    float: 'right',
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer'
+                  }}
+                  onClick={() => setShowImpactModal(false)}
+                >✕</button>
+              </div>
+
+              <div style={{ padding: '8px' }}>
+                
+                <div className="detail-row">
+                  <span className="detail-label incoming ">In: </span>
+                  <span className="detail-value incoming">{swapInfo.in}</span>
+                </div>
+
+                <div className="detail-row">
+                  <span className="detail-label outgoing">Out: </span>
+                  <span className="detail-value outgoing">{swapInfo.out}</span>
+                </div>
+              
+                <div
+                  className="detail-row"
+                >
+                  <span className="detail-label">Net Transfer : </span>
+                  <span className="detail-value">
+                    {diffMv >= 0 ? '+ ' : '- '}{Math.abs(diffMv).toLocaleString()} €
+                  </span>
+                </div>
+                {Object.entries(lineupDiffStats).map(([key, val]) => (
+                  <div
+                    className="detail-row"
+                    key={key}
+                  >
+                    <span className="detail-label">
+                      {FIELD_LABELS_STATS[key] || key}
+                    </span>
+                    <span className="detail-value">
+                      {val >= 0 ? ': + ' : ': - '}{Math.abs(val).toFixed(1)}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           </Draggable>
         </>

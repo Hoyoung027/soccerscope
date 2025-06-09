@@ -77,15 +77,18 @@ export default function App() {
   const [playersLoading, setPlayersLoading] = useState(false);
   const [playersError, setPlayersError]     = useState(null);
   
+  const detailRef = useRef(null); 
+
   // 선수 detail
   const [allPlayerStats, setAllPlayerStats] = useState([]);    
   const [selectedPlayerId, setSelectedPlayerId] = useState(null); 
-  const detailRef = useRef(null); 
+  const playerDetailRef = useRef(null); 
 
   // 팀 detail 
   const [allClubStats, setAllClubStats] = useState([]); 
   const [showClubDetail, setShowClubDetail] = useState(false);
-
+  const teamDetailRef   = useRef(null);
+  
   // Roster, Formation 구성용
   const [teamName, setTeamName] = useState('Tottenham'); 
   const [playersIn433, setPlayersIn433] = useState([]); 
@@ -117,6 +120,9 @@ export default function App() {
   // 차트에 넘길 최종 선수 목록
   const chartPlayers = [...manualPlayers, ...recommendedPlayers];
   
+  //추천 기능 on-off
+  const [enableRec, setEnableRec] = useState(true);
+
   useEffect(() => {
     setStatsLoading(true);
     setStatsError(null);
@@ -610,43 +616,45 @@ export default function App() {
 
   // 추천 로직
   useEffect(() => {
-    if (!rawData || manualPlayers.length === 0 || columns.length === 0) {
-      setRecommendedPlayers([]);
-      return;
-    }
-    const base = manualPlayers[0];
-    const baseRow = rawData.find(d => d.Player === base);
-    if (!baseRow) return;
-    const baseMV = +baseRow.market_value;
+  // 추천 기능이 꺼져 있거나, data/선수/카테고리가 없으면 빈 배열
+  if (!enableRec || !rawData || manualPlayers.length === 0 || columns.length === 0) {
+    setRecommendedPlayers([]);
+    return;
+  }
 
-    const higher = rawData.filter(
-      d => !manualPlayers.includes(d.Player) && +d.market_value > baseMV
-    );
-    const lower = rawData.filter(
-      d => !manualPlayers.includes(d.Player) && +d.market_value < baseMV
-    );
+  const base = manualPlayers[0];
+  const baseRow = rawData.find(d => d.Player === base);
+  if (!baseRow) {
+    setRecommendedPlayers([]);
+    return;
+  }
+  const baseMV = +baseRow.market_value;
 
-    const sortByRankSum = arr =>
-      arr
-        .map(d => {
-          const sum = columns.reduce((acc, c) => {
-            const raw = d[`${c}_rank`];
-            // 랭크가 유효한 숫자면 변환, 아니면 Infinity
-            const num = (raw != null && raw !== '')
-              ? +raw
-              : Infinity;
-            return acc + num;
-          }, 0);
-          return { player: d.Player, sum };
-        })
-        .sort((a, b) => a.sum - b.sum)
-        .map(x => x.player);
+  const higher = rawData.filter(
+    d => !manualPlayers.includes(d.Player) && +d.market_value > baseMV
+  );
+  const lower = rawData.filter(
+    d => !manualPlayers.includes(d.Player) && +d.market_value < baseMV
+  );
 
-    const topHigh = sortByRankSum(higher).slice(0, 4);
-    const topLow  = sortByRankSum(lower).slice(0, 4);
+  const sortByRankSum = arr =>
+    arr
+      .map(d => {
+        const sum = columns.reduce((acc, c) => {
+          const raw = d[`${c}_rank`];
+          const num = (raw != null && raw !== '') ? +raw : Infinity;
+          return acc + num;
+        }, 0);
+        return { player: d.Player, sum };
+      })
+      .sort((a, b) => a.sum - b.sum)
+      .map(x => x.player);
 
-    setRecommendedPlayers([...topHigh, ...topLow]);
-  }, [rawData, manualPlayers, columns]);
+  const topHigh = sortByRankSum(higher).slice(0, 4);
+  const topLow  = sortByRankSum(lower).slice(0, 4);
+
+  setRecommendedPlayers([...topHigh, ...topLow]);
+}, [rawData, manualPlayers, columns, enableRec]);
   
 
 
@@ -705,8 +713,8 @@ export default function App() {
           {showClubDetail && (
             <>
               <div className="detail-overlay" onClick={handleCloseClubDetail} />
-              <Draggable nodeRef={detailRef} handle=".drag-handle">
-                <div className="detail-wrapper" ref={detailRef}>
+              <Draggable nodeRef={teamDetailRef} handle=".drag-handle">
+                <div className="detail-wrapper" ref={teamDetailRef}>
                   <div className="drag-handle">
                     Detail
                     <button
@@ -859,6 +867,18 @@ export default function App() {
                 </div>
               </div>
 
+              <div className="box rec-toggle-box">
+                <label className="rec-toggle-label">
+                  <input
+                    type="checkbox"
+                    checked={enableRec}
+                    onChange={() => setEnableRec(on => !on)}
+                  />
+                  Enable recommendations
+                </label>
+              </div>
+
+
               <div className="add-box">
                 {/* position:relative 반드시 확인 */}
                 <div className="add-button-box" style={{ position: 'relative' }}>
@@ -959,38 +979,11 @@ export default function App() {
       {selectedPlayerId && (
         <>
           <div className="detail-overlay" onClick={() => setSelectedPlayerId(null)} />
-          <Draggable nodeRef={detailRef} handle=".drag-handle">
-            <div className="detail-wrapper" ref={detailRef}>
+          <Draggable nodeRef={playerDetailRef} handle=".drag-handle">
+            <div className="detail-wrapper" ref={playerDetailRef}>
               <div className="drag-handle">Player Detail</div>
               <PlayerDetail
                 playerStat={allPlayerStats.find(d => d.Player_Id === selectedPlayerId)}
-              />
-            </div>
-          </Draggable>
-        </>
-      )}
-
-      {showClubDetail && (
-        <>
-          <div className="detail-overlay" onClick={handleCloseClubDetail} />
-          <Draggable nodeRef={detailRef} handle=".drag-handle">
-            <div className="detail-wrapper" ref={detailRef}>
-              <div className="drag-handle">
-                Detail
-                <button
-                  style={{
-                    float: 'right',
-                    border: 'none',
-                    background: 'transparent',
-                    cursor: 'pointer'
-                  }}
-                  onClick={handleCloseClubDetail}
-                >✕</button>
-              </div>
-              <TeamDetail
-                clubStat={allClubStats.find(d => d.name.trim() === teamName)}
-                teamAggregates={teamAggregates[teamName]}
-                selectedTeam={teamName}
               />
             </div>
           </Draggable>

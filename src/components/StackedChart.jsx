@@ -333,7 +333,7 @@ export default function StackedChart({
 
     // 16) 범례
     const legend = svg.append('g')
-      .attr('transform', `translate(${margin.left + w - 100},${margin.top + 5})`);
+      .attr('transform', `translate(${margin.left + w - 80},${margin.top - 30})`);
     columns.forEach((col, i) => {
       const g = legend.append('g').attr('transform', `translate(0,${i * 18})`);
       g.append('rect')

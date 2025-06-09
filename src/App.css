@@ -220,7 +220,7 @@ body {
 .detail-graph-wrapper {
   position: fixed;
   top: 10%;
-  left: 55%;
+  left: 30%;
   transform: translate(-50%, -50%);
   width: fit-content;
   height: fit-content;

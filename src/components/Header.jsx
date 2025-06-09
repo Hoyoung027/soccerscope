@@ -1,76 +1,77 @@
 // src/components/Header.jsx
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import './Header.css';
 
-const Header = ({ onSearch }) => {
+const Header = ({ onSearch, teamList = [] }) => {
   const [inputValue, setInputValue] = useState('');
+  const [suggestions, setSuggestions] = useState([]);
+  const wrapperRef = useRef(null);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = e => {
     e.preventDefault();
-    const trimmed = inputValue.trim();
-    if (trimmed) {
-      onSearch(trimmed);
+    if (inputValue.trim()) {
+      onSearch(inputValue.trim());
       setInputValue('');
+      setSuggestions([]);
     }
   };
 
-  return (
-    <header style={styles.header}>
-      {/* 좌측 로고(앱 이름) */}
-      <div style={styles.logo}>
-        ⚽️ <strong>SoccerScope</strong>
-      </div>
+  const handleChange = e => {
+    const val = e.target.value;
+    setInputValue(val);
+    if (val) {
+      const lower = val.toLowerCase();
+      setSuggestions(
+        teamList
+          .filter(name => name.toLowerCase().includes(lower))
+          .slice(0, 5)
+      );
+    } else {
+      setSuggestions([]);
+    }
+  };
 
-      {/* 우측 검색 폼 */}
-      <form onSubmit={handleSubmit} style={styles.searchForm}>
+  const handleSelect = name => {
+    onSearch(name);
+    setInputValue('');
+    setSuggestions([]);
+  };
+
+  useEffect(() => {
+    const onClickOutside = e => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
+        setSuggestions([]);
+      }
+    };
+    document.addEventListener('click', onClickOutside);
+    return () => document.removeEventListener('click', onClickOutside);
+  }, []);
+
+  return (
+    <header className="header" ref={wrapperRef}>
+      <div className="logo">⚽️ <strong>SoccerScope</strong></div>
+      <form className="search-form" onSubmit={handleSubmit}>
         <input
+          className="search-input"
           type="text"
           placeholder="Search the Team"
           value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          style={styles.searchInput}
+          onChange={handleChange}
         />
-        <button type="submit" style={styles.searchButton}>
-          Search
-        </button>
+        <button className="search-button" type="submit">Search</button>
+
+        {suggestions.length > 0 && (
+          <ul className="autocomplete">
+            {suggestions.map(team => (
+              <li key={team} onClick={() => handleSelect(team)}>
+                {team}
+              </li>
+            ))}
+          </ul>
+        )}
       </form>
     </header>
   );
 };
 
 export default Header;
-
-const styles = {
-  header: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '8px 20px',
-    backgroundColor: '#205723',
-    color: 'white',
-    marginBottom: '10px',
-  },
-  logo: {
-    fontSize: '1.2rem',
-  },
-  searchForm: {
-    display: 'flex',
-    alignItems: 'center',
-  },
-  searchInput: {
-    padding: '4px 8px',
-    borderRadius: '4px 0 0 4px',
-    border: '1px solid #ccc',
-    fontSize: '0.9rem',
-    outline: 'none',
-    width: '160px',
-  },
-  searchButton: {
-    padding: '5px 10px',
-    border: 'none',
-    backgroundColor: '#3F7D2A', // 버튼 녹색
-    color: 'white',
-    borderRadius: '0 4px 4px 0',
-    cursor: 'pointer',
-    fontSize: '0.9rem',
-  },
-};

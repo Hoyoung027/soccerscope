@@ -1,5 +1,5 @@
 // src/components/TeamAnalysis.jsx
-import React, { useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 import './TeamAnalysis.css';
 
@@ -17,16 +17,54 @@ function getPosCategory(subPos) {
 }
 
 function Heatmap({ data }) {
+
+  const wrapperRef = useRef();
+  const [tip, setTip] = useState({ visible: false, x: 0, y: 0, name: '', value: 0 });
+
+  const showTip = (e, name, value) => {
+  const cellRect = e.currentTarget.getBoundingClientRect();
+  const wrapRect = wrapperRef.current.getBoundingClientRect();
+  const x = cellRect.left - wrapRect.left + cellRect.width / 2;
+  const y = cellRect.top  - wrapRect.top - 3;
+  setTip({ visible: true, x, y, name, value });
+};
+
+  const hideTip = () => setTip(t => ({ ...t, visible: false }));
+  
   const values = data.map(d => d.value);
   const min = Math.min(...values);
   const max = Math.max(...values);
 
-  const rows = 40;
+  const rows = 15;
   const cols = Math.ceil(data.length / rows);
 
   return (
-    <div className='heatmap-wrapper'>
-        <div className="heatmap-grid">
+    <div ref={wrapperRef} className='heatmap-wrapper' style={{ position: 'relative' }}>
+      {/* ② 툴팁 엘리먼트 */}
+      {tip.visible && (
+        <div
+          className="heatmap-tooltip"
+          style={{
+            position: 'absolute',
+            left: tip.x,
+            top: tip.y,
+            background: 'rgba(0,0,0,0.75)',
+            color: '#fff',
+            padding: '2px 6px',
+            borderRadius: '4px',
+            pointerEvents: 'none',
+            whiteSpace: 'nowrap',
+            fontSize: '10px',
+            zIndex: 1000,
+            transform: 'translate(-50%, -100%)'
+          }}
+        >
+          {tip.name}: {tip.value.toFixed(2)}
+        </div>
+      )}
+
+      <div className="heatmap-grid">
+
         {data.map(({ name, value, isOur }, i) => {
 
             const ratio = max > min ? (value - min) / (max - min) : 0;
@@ -41,16 +79,17 @@ function Heatmap({ data }) {
             const bg = `rgba(220,20,60,${alpha})`;
 
             return (
-            // title 속성으로만 툴팁 제공
             <div
-                key={name}
-                className="heatmap-cell"
-                title={`${name}: ${value.toFixed(2)}`}
-                style={{
+              key={name}
+              className="heatmap-cell"
+              data-tooltip={`${name}: ${value.toFixed(2)}`}
+              style={{
                 backgroundColor: bg,
-                /* 우리팀 선수만 진한 테두리로 강조 */
                 border: isOur ? '2px solid #000' : '1px solid #ccc'
-                }}
+              }}
+              onMouseEnter={e => showTip(e, name, value)}
+              onMouseMove={e => showTip(e, name, value)}
+              onMouseLeave={hideTip}
             />
         );
         })}
@@ -116,6 +155,20 @@ export default function TeamAnalysis({
     const g = svg.append('g')
       .attr('transform', `translate(${margin.left},${margin.top})`);
 
+    let tooltip = d3.select('body').select('.bar-tooltip');    if (tooltip.empty()) {
+      tooltip = d3.select('body')
+        .append('div')
+        .attr('class', 'bar-tooltip')
+        .style('position', 'absolute')
+        .style('pointer-events', 'none')
+        .style('padding', '4px 8px')
+        .style('background', 'rgba(0,0,0,0.7)')
+        .style('color', '#fff')
+        .style('font-size', '10px')
+        .style('border-radius', '4px')
+        .style('visibility', 'hidden');
+    }
+
     // bar
     g.selectAll('rect.bar')
       .data(players)
@@ -127,7 +180,7 @@ export default function TeamAnalysis({
         .attr('height', d => h - y(d.value))
         .attr('fill',   'rgba(32,87,35,0.4)')
         .attr('stroke', '#205723')       
-        .attr('stroke-width', 1);       
+        .attr('stroke-width', 1);
 
     // season avg dashed line
     g.append('line')
@@ -190,19 +243,18 @@ export default function TeamAnalysis({
   }, [rawData, teamName, compareKey, selectedCategory, chartType, width, height]);
 
   if (chartType === 'heatmap') {
-    const data = rawData
+
+    const filtered = rawData.filter(d =>
+      getPosCategory(d.sub_position) === selectedCategory
+    );
+    
+    const data = filtered
         .map(d => ({
             name: d.Player,
             value: +d[compareKey],
             isOur: d.Squad === teamName
         }))
         .sort((a, b) => b.value - a.value);
-
-      // 팀의 모든 선수를 값 내림차순으로 정렬
-    // const data = rawData
-    //   .filter(d => d.Squad === teamName)
-    //   .map(d => ({ name: d.Player, value: +d[compareKey] }))
-    //   .sort((a, b) => b.value - a.value);
 
     return <Heatmap data={data} />;
   }

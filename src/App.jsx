@@ -777,20 +777,19 @@ export default function App() {
                     </select>
                   </label>
                   
-                  {chartType === 'bar' && (
-                    <label>
-                      Position:
-                      <select
-                        value={selectedCategory}
-                        onChange={e => setSelectedCategory(e.target.value)}
-                        style={{ marginLeft: '4px' }}
-                      >
-                        <option value="FW">Attack</option>
-                        <option value="MF">Midfield</option>
-                        <option value="DF">Defense</option>
-                      </select>
-                    </label>
-                  )}
+                  <label>
+                    Position:
+                    <select
+                      value={selectedCategory}
+                      onChange={e => setSelectedCategory(e.target.value)}
+                      style={{ marginLeft: '4px' }}
+                    >
+                      <option value="FW">Attack</option>
+                      <option value="MF">Midfield</option>
+                      <option value="DF">Defense</option>
+                    </select>
+                  </label>
+
                 </div>
                 <TeamAnalysis
                   chartType={chartType}

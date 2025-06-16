@@ -1,83 +1,81 @@
-[![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-22041afd0340ce965d47ae6ef1cefeee28c7c493a6346c4f15d667ab976d596c.svg)](https://classroom.github.com/a/XqiWbVsP)
-# Data Visualization HW 3
+나의 말:
+프로젝트를 진행했는데, 자기가 프로젝트에 어떻게 기여했는지 적으라고 했거든?
+일단 내가 한 일을 알려줄게.
 
-You must fill out the following form. Please see LearnUs for detailed instructions.
+나는 실제로 플랫폼 개발을 맡았어. 그중에서도 stacked bar 시각화와 추천 기능 구현을 주로 맡았어. 그리고 데이터 시각화 선택할 시 발생할 수 있는 문제점을 고려하며 효과적인 시각화에 대한 방안을 제공, 이를 위한 데이터 가공의 적절성 등을 평가했어. 전체적인 방향성에서 우리가 고려해야할 건 무엇인지 세부적인 방향을 제공했어.
 
----
-- Name: 변호영
-- URL to video demo: https://youtu.be/591nNjdycN8
-- Optional comment: 
-- ChatGPT 사용 내역
+이걸 좀 잘 다듬어서 말을 만들어줄래?
 
-## 1. 축(Axis) 스타일링 변경하기  
-**질문**  
-> 상단 0.0–1.0 축의 선 색을 `#ccc`보다 더 진한 회색으로 바꿀 수 있을까요?  
 
-**답변 요약**  
-```js
-axisG.selectAll('.domain')
-  .attr('stroke', '#999');
-axisG.selectAll('line')
-  .attr('stroke', '#999');
-axisG.selectAll('text')
-  .attr('fill', '#666');
-```
+ChatGPT의 말:
+물론이지! 아래처럼 정리해봤어. 자연스럽고도 명확하게 기여 내용을 드러낼 수 있도록 다듬었어:
 
-## 2. 썸네일 박스 채우기 및 테두리 지정  
-**질문**  
-> 각 작은 이미지를 true label 색으로 채우고, predicted label 색으로 테두리 표시하려면?
-```js
-svg.append('rect')
-   .attr('fill', color(d.true_label))       // 배경 색
-   .attr('stroke', color(d.predicted_label)) // 테두리 색
-   // …;
+프로젝트에서 실제 플랫폼 개발을 담당했으며, 그중에서도 stacked bar 형태의 시각화 구현과 추천 기능 개발을 주로 맡았습니다. 또한, 데이터 시각화 선택 시 발생할 수 있는 문제점을 사전에 고려하여, 효과적인 시각화 방안을 제시하고 이를 위해 필요한 데이터 가공의 적절성 평가에도 기여했습니다. 팀의 전체적인 방향 설정 과정에서도, 우리가 고려해야 할 핵심 요소들을 중심으로 구체적인 실행 방향을 제안하며 프로젝트의 완성도를 높이는 데 기여했습니다.
 
-svg.append('image')
-   .attr('href', `/images/${d.filename}`)
-   // …;
-```
+혹시 더 구체적인 기술 스택이나 사용한 라이브러리, 또는 어려웠던 점을 강조하고 싶으면 추가해서 더 다듬을 수 있어!
 
-## 3. select로 점 강조
-**질문**
-> Projection View에서 점 하나를 클릭하면 그 점만 크게, 나머지는 반투명 유지하게 할 수 있나요?
 
-```js
-// 클릭 시 selected 상태 업데이트
-.on('click', (e,d) => {
-  setSelected(prev => prev && prev.id===d.id ? null : d);
-});
 
-// useEffect에서 반영
-psvg.selectAll('circle')
-    .attr('opacity', d =>
-      selected ? (d.id===selected.id ? 1 : 0.1) : 0.6
-    )
-    .attr('r', d =>
-      selected && d.id===selected.id ? 6 : 3
-    );
 
-```
 
-## 4. “Labeled as i” / “Predicted as k” 필터링
-**질문**
-> 클래스 텍스트를 클릭하면 해당 true_label=i 또는 predicted_label=k만 필터링, 다시 클릭 시 해제되게 만들고 싶어요.
 
-```js
-// 텍스트 클릭
-.on('click', () => setTrueFilter(prev => prev===i? null : i));
 
-// opacity 로직
-.attr('opacity', d => {
-  if (trueFilter!==null)   return d.true_label===trueFilter?1:0.1;
-  if (predFilter!==null)   return d.predicted_label===predFilter?1:0.1;
-  if (selected)            return d.id===selected.id?1:0.1;
-  if (hovered)             return d.id===hovered.id?1:0.1;
-  return defaultOpacity;
-});
-```
+나의 말:
+readme 파일을 짜줘
 
----
+플랫폼 이름: soccerscope
+축구 클럽 이적 시장 전략을 위한 스탯 기각화 플랫폼.
 
-This repository contains the skeleton code used in the Data Visualization course at Yonsei University taught by Prof. Minsuk Kahng.
+개발 스택: react
 
-The digits dataset is from https://archive.ics.uci.edu/ml/datasets/Optical+Recognition+of+Handwritten+Digits through scikit-learn.
+-주요 기능
+1. 팀 로스터
+특정 팀 로스터 확인 기능, 벤치 선수와 필드 선수의 교체 interaction, 교체 시 스탯 변화 확인 기능
+2. 팀 스탯
+득점, 리커버리, 골 기대치, 어시스트 기대치, 유효슛, 인터셉트의 항목으로 이루어진 radar chart. 팀 스탯 세부 정보 확인 기능
+3. 팀 analysis
+팀 내 선수 스탯 비교(bar chart), 모든 선수의 스탯별 heatmap
+4. Player Comparison
+stacked bar 형태로 선수 스탯 비교, 추천 기능, 스탯별 bar rearange 구현.
+
+*참고: 필드 영역의 카드 dragging은 윈도우 환경에서만 동작
+
+
+ChatGPT의 말:
+아래는 요청하신 내용을 바탕으로 작성한 README.md 초안이야. 깔끔하게 구조화하고, 플랫폼 목적과 기능이 잘 드러나도록 정리했어:
+
+markdown
+복사
+편집
+# ⚽️ Soccerscope
+
+**Soccerscope**는 축구 클럽의 이적 시장 전략 수립을 돕기 위한 **스탯 기반 시각화 플랫폼**입니다.  
+실제 팀 로스터를 기반으로 다양한 스탯을 시각적으로 비교하고, 선수를 분석하거나 추천할 수 있도록 구성되어 있습니다.
+
+## 🛠 개발 스택
+
+- Frontend: **React**
+- Visualization: **D3.js** (내부 시각화 구현에 사용되었다면 명시 가능)
+
+## 🔑 주요 기능
+
+### 1. 팀 로스터 (Team Roster)
+- 특정 팀의 로스터를 시각화하여 확인할 수 있습니다.
+- **필드 선수와 벤치 선수 간의 교체 인터랙션**을 통해 교체 전/후의 스탯 변화를 확인할 수 있습니다.
+
+### 2. 팀 스탯 (Team Stats)
+- 득점, 리커버리, 골 기대치(xG), 어시스트 기대치(xA), 유효 슛, 인터셉트 등의 주요 항목을 기반으로 한 **Radar Chart** 제공
+- 각 항목에 대한 **세부 수치 확인 기능** 포함
+
+### 3. 팀 분석 (Team Analysis)
+- 팀 내 선수들 간의 **스탯 비교 바 차트**
+- 전체 선수들을 대상으로 하는 **스탯별 Heatmap 시각화**
+
+### 4. 선수 비교 (Player Comparison)
+- **Stacked bar chart**를 활용한 선수 간 스탯 비교
+- **선수 추천 기능** 제공 (기존 선수와 유사한 스탯을 지닌 선수 탐색)
+- **스탯 항목별 bar 재배열 기능** 포함 (사용자가 비교 항목을 선택하고 정렬 가능)
+
+## ⚠️ 사용 환경 유의사항
+
+- 필드 영역의 **카드 Drag & Drop 기능은 Windows 환경에서만 정상적으로 동작**합니다.
